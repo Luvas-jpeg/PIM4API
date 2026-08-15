@@ -59,15 +59,88 @@ public class AuthService
             return AuthServiceResult<LoginResponse>.Fail("E-mail ou senha inválidos.");
         }
 
-        var token = _tokenService.GenerateToken(user);
+        var accessToken = _tokenService.GenerateToken(user);
+
+        // create refresh token
+        var refreshTokenValue = GenerateRefreshTokenValue();
+        var refresh = new RefreshToken
+        {
+            Token = refreshTokenValue,
+            UserId = user.ID,
+            ExpiresAt = DateTime.UtcNow.AddDays(30)
+        };
+
+        _context.RefreshTokens.Add(refresh);
+        await _context.SaveChangesAsync();
 
         var response = new LoginResponse
         {
-            Token = token,
+            AccessToken = accessToken,
+            RefreshToken = refreshTokenValue,
+            ExpiresIn = (int)TimeSpan.FromHours(24).TotalSeconds,
             User = ToResponse(user)
         };
 
         return AuthServiceResult<LoginResponse>.Ok(response);
+    }
+
+    public async Task<AuthServiceResult<LoginResponse>> RefreshAsync(string refreshToken)
+    {
+        var token = await _context.RefreshTokens.Include(rt => rt.User)
+            .FirstOrDefaultAsync(rt => rt.Token == refreshToken);
+
+        if (token == null || !token.IsActive)
+        {
+            return AuthServiceResult<LoginResponse>.Fail("Refresh token inválido ou expirado.");
+        }
+
+        // rotate token: revoke old and create new
+        token.RevokedAt = DateTime.UtcNow;
+
+        var newRefreshValue = GenerateRefreshTokenValue();
+        token.ReplacedByToken = newRefreshValue;
+
+        var newRefresh = new RefreshToken
+        {
+            Token = newRefreshValue,
+            UserId = token.UserId,
+            ExpiresAt = DateTime.UtcNow.AddDays(30)
+        };
+
+        _context.RefreshTokens.Add(newRefresh);
+        await _context.SaveChangesAsync();
+
+        var access = _tokenService.GenerateToken(token.User!);
+
+        var response = new LoginResponse
+        {
+            AccessToken = access,
+            RefreshToken = newRefreshValue,
+            ExpiresIn = (int)TimeSpan.FromHours(24).TotalSeconds,
+            User = ToResponse(token.User!)
+        };
+
+        return AuthServiceResult<LoginResponse>.Ok(response);
+    }
+
+    public async Task<bool> LogoutAsync(int userId)
+    {
+        var tokens = await _context.RefreshTokens.Where(rt => rt.UserId == userId && rt.RevokedAt == null).ToListAsync();
+
+        foreach (var t in tokens)
+            t.RevokedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
+
+    private static string GenerateRefreshTokenValue()
+    {
+        var bytes = new byte[64];
+        using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+        rng.GetBytes(bytes);
+        return Convert.ToBase64String(bytes);
     }
 
     public async Task<AuthServiceResult<UserResponseDTO>> UpdateProfileAsync(int userId, UpdateProfileDTO request)

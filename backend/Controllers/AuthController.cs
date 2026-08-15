@@ -53,6 +53,31 @@ namespace EquipamentosMedicosApi.Controllers
             return Ok(result.Data);
         }
 
+        [HttpPost("refresh")]
+        public async Task<IActionResult> Refresh([FromBody] DTOs.RefreshTokenRequestDTO request)
+        {
+            var result = await _authService.RefreshAsync(request.RefreshToken);
+
+            if (!result.Success)
+                return Unauthorized(new { message = result.Error });
+
+            return Ok(result.Data);
+        }
+
+        [HttpPost("logout")]
+        [Authorize]
+        public async Task<IActionResult> Logout()
+        {
+            var userId = GetAuthenticatedUserId();
+
+            if (userId == null)
+                return Unauthorized();
+
+            await _authService.LogoutAsync(userId.Value);
+
+            return NoContent();
+        }
+
         [HttpPut("perfil")]
         [Authorize]
         public async Task<IActionResult> AtualizarPerfil([FromBody] UpdateProfileDTO request)

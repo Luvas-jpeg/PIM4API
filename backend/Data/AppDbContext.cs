@@ -15,10 +15,28 @@ namespace EquipamentosMedicosApi.Data
         public DbSet<Enrollment> Enrollments { get; set; }
         public DbSet<Student> Students { get; set; }
         public DbSet<PromoCode> PromoCodes { get; set; }
+        public DbSet<RefreshToken> RefreshTokens { get; set; }
+        public DbSet<CourseProgress> CourseProgresses { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<Order>()
+                .Property(order => order.Status)
+                .HasDefaultValue("pending");
+
+            modelBuilder.Entity<Order>()
+                .Property(order => order.PaymentStatus)
+                .HasDefaultValue("pending");
+
+            modelBuilder.Entity<RefreshToken>()
+                .HasIndex(refreshToken => refreshToken.Token)
+                .IsUnique();
+
+            modelBuilder.Entity<CourseProgress>()
+                .HasIndex(progress => new { progress.UserId, progress.CourseId })
+                .IsUnique();
 
             // Seed de dados
             modelBuilder.Entity<Product>().HasData(
@@ -42,6 +60,13 @@ namespace EquipamentosMedicosApi.Data
                 new PromoCode { Id = 1, Code = "MEDICO10", Discount = 10m, DiscountType = "percentage", StartDate = "2026-04-01", EndDate = "2026-12-31", IsActive = true, UsageLimit = 100, UsageCount = 5 },
                 new PromoCode { Id = 2, Code = "PRIMEIRACOMPRA", Discount = 50m, DiscountType = "fixed", StartDate = "2026-01-01", EndDate = "2026-12-31", IsActive = true, UsageCount = 12 }
             );
+
+            // Optional: set up JSON mapping for CourseProgress.CompletedLessons
+            modelBuilder.Entity<CourseProgress>().Property(p => p.CompletedLessons)
+                .HasConversion(
+                    v => System.Text.Json.JsonSerializer.Serialize<List<int>>(v, (System.Text.Json.JsonSerializerOptions?)null),
+                    v => System.Text.Json.JsonSerializer.Deserialize<List<int>>(v, (System.Text.Json.JsonSerializerOptions?)null) ?? new List<int>()
+                );
         }
     }
 }

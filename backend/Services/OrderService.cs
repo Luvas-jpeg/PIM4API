@@ -9,10 +9,10 @@ public class OrderService
 {
     private static readonly HashSet<string> AllowedStatuses = new()
     {
-        "Pendente",
-        "Processando",
-        "Concluido",
-        "Cancelado"
+        "pending",
+        "processing",
+        "completed",
+        "cancelled"
     };
 
     private readonly AppDbContext _context;
@@ -43,7 +43,7 @@ public class OrderService
 
         var paymentMethod = request.PaymentMethod.Trim().ToLower();
 
-        if (paymentMethod != "credit" && paymentMethod != "debit" && paymentMethod != "pix")
+        if (paymentMethod != "credit_card" && paymentMethod != "debit_card" && paymentMethod != "pix")
         {
             return ServiceResult<CreateOrderResponse>.Fail("Forma de pagamento invalida.");
         }
@@ -78,10 +78,11 @@ public class OrderService
         {
             UsuarioId = userId,
             DataPedido = DateTime.UtcNow,
-            Status = "Pendente",
+            Status = "pending",
+            PaymentStatus = "pending",
             ValorFrete = request.ValorFrete,
             PaymentMethod = paymentMethod,
-            Installments = paymentMethod == "credit" ? request.Installments : null,
+            Installments = paymentMethod == "credit_card" ? request.Installments : null,
             PromoCode = request.PromoCode.Trim().ToUpper(),
             Itens = request.Itens.Select(item =>
             {

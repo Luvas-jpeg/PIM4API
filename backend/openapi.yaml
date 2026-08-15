@@ -1,0 +1,1031 @@
+openapi: 3.0.3
+info:
+  title: MediShop Courses API
+  version: "1.0.0"
+  description: API central para venda de cursos no site, administracao via desktop e area do aluno no app Flutter.
+servers:
+  - url: https://api.seudominio.com.br/api
+    description: Producao
+  - url: http://localhost:5000/api
+    description: Desenvolvimento local
+tags:
+  - name: Auth
+  - name: Courses
+  - name: Orders
+  - name: StudentArea
+  - name: Payments
+  - name: Admin
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Cadastrar usuario comprador/aluno
+      operationId: registerUser
+      security: []
+      requestBody:
+        $ref: '#/components/requestBodies/Register'
+      responses:
+        "201":
+          description: Usuario criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "409":
+          $ref: '#/components/responses/Conflict'
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login de usuario ou admin
+      operationId: login
+      security: []
+      requestBody:
+        $ref: '#/components/requestBodies/Login'
+      responses:
+        "200":
+          description: Login realizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Renovar access token
+      operationId: refreshToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        "200":
+          description: Token renovado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Encerrar sessao
+      operationId: logout
+      responses:
+        "204":
+          description: Sessao encerrada
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+  /me:
+    get:
+      tags: [Auth]
+      summary: Obter usuario autenticado
+      operationId: getMe
+      responses:
+        "200":
+          description: Usuario autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      tags: [Auth]
+      summary: Atualizar perfil do usuario autenticado
+      operationId: updateMe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        "200":
+          description: Perfil atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+  /courses:
+    get:
+      tags: [Courses]
+      summary: Listar cursos publicados para venda no site
+      operationId: listCourses
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Lista paginada de cursos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedCourses'
+  /courses/{courseId}:
+    get:
+      tags: [Courses]
+      summary: Obter detalhes publicos de um curso
+      operationId: getCourse
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/CourseId'
+      responses:
+        "200":
+          description: Curso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Course'
+        "404":
+          $ref: '#/components/responses/NotFound'
+  /orders:
+    post:
+      tags: [Orders]
+      summary: Criar pedido de compra de curso
+      operationId: createOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        "201":
+          description: Pedido criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+  /orders/my:
+    get:
+      tags: [Orders]
+      summary: Listar compras do usuario autenticado
+      operationId: listMyOrders
+      responses:
+        "200":
+          description: Compras do usuario
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+  /orders/{orderId}:
+    get:
+      tags: [Orders]
+      summary: Obter uma compra do usuario autenticado
+      operationId: getMyOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        "200":
+          description: Pedido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+  /me/courses:
+    get:
+      tags: [StudentArea]
+      summary: Listar cursos liberados para o aluno
+      operationId: listMyCourses
+      responses:
+        "200":
+          description: Cursos comprados/liberados
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StudentCourse'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+  /me/courses/{courseId}:
+    get:
+      tags: [StudentArea]
+      summary: Obter curso liberado na area do aluno
+      operationId: getMyCourse
+      parameters:
+        - $ref: '#/components/parameters/CourseId'
+      responses:
+        "200":
+          description: Curso do aluno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentCourse'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+  /me/courses/{courseId}/progress:
+    get:
+      tags: [StudentArea]
+      summary: Obter progresso do aluno em um curso
+      operationId: getMyCourseProgress
+      parameters:
+        - $ref: '#/components/parameters/CourseId'
+      responses:
+        "200":
+          description: Progresso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseProgress'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      tags: [StudentArea]
+      summary: Atualizar progresso do aluno
+      operationId: updateMyCourseProgress
+      parameters:
+        - $ref: '#/components/parameters/CourseId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProgressRequest'
+      responses:
+        "200":
+          description: Progresso atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseProgress'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+  /payments/webhook:
+    post:
+      tags: [Payments]
+      summary: Receber notificacao do gateway de pagamento
+      operationId: receivePaymentWebhook
+      security:
+        - webhookSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentWebhook'
+      responses:
+        "200":
+          description: Webhook processado
+        "400":
+          $ref: '#/components/responses/BadRequest'
+  /admin/courses:
+    get:
+      tags: [Admin]
+      summary: Listar cursos no desktop administrativo
+      operationId: adminListCourses
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        "200":
+          description: Cursos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedCourses'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Admin]
+      summary: Criar curso
+      operationId: adminCreateCourse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveCourseRequest'
+      responses:
+        "201":
+          description: Curso criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Course'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+  /admin/courses/{courseId}:
+    put:
+      tags: [Admin]
+      summary: Atualizar curso
+      operationId: adminUpdateCourse
+      parameters:
+        - $ref: '#/components/parameters/CourseId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveCourseRequest'
+      responses:
+        "200":
+          description: Curso atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Course'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Admin]
+      summary: Remover ou arquivar curso
+      operationId: adminDeleteCourse
+      parameters:
+        - $ref: '#/components/parameters/CourseId'
+      responses:
+        "204":
+          description: Curso removido
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+  /admin/orders:
+    get:
+      tags: [Admin]
+      summary: Listar compras no desktop administrativo
+      operationId: adminListOrders
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+      responses:
+        "200":
+          description: Pedidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedOrders'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+  /admin/orders/{orderId}:
+    get:
+      tags: [Admin]
+      summary: Detalhar compra no desktop administrativo
+      operationId: adminGetOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        "200":
+          description: Pedido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+  /admin/orders/{orderId}/status:
+    put:
+      tags: [Admin]
+      summary: Atualizar status da compra
+      operationId: adminUpdateOrderStatus
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrderStatusRequest'
+      responses:
+        "200":
+          description: Status atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+  /admin/students:
+    get:
+      tags: [Admin]
+      summary: Listar alunos e matriculas
+      operationId: adminListStudents
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        "200":
+          description: Alunos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedStudents'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+  /admin/promocodes:
+    get:
+      tags: [Admin]
+      summary: Listar cupons
+      operationId: adminListPromoCodes
+      responses:
+        "200":
+          description: Cupons
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PromoCode'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Admin]
+      summary: Criar cupom
+      operationId: adminCreatePromoCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SavePromoCodeRequest'
+      responses:
+        "201":
+          description: Cupom criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoCode'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    webhookSignature:
+      type: apiKey
+      in: header
+      name: X-Webhook-Signature
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    CourseId:
+      name: courseId
+      in: path
+      required: true
+      schema:
+        type: integer
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema:
+        type: integer
+  requestBodies:
+    Register:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RegisterRequest'
+    Login:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/LoginRequest'
+  responses:
+    BadRequest:
+      description: Requisicao invalida
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Unauthorized:
+      description: Token ausente, invalido ou expirado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Forbidden:
+      description: Usuario sem permissao
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    NotFound:
+      description: Recurso nao encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Conflict:
+      description: Conflito de dados
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+  schemas:
+    ApiError:
+      type: object
+      required: [message]
+      properties:
+        code:
+          type: string
+          example: validation_error
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+    RegisterRequest:
+      type: object
+      required: [name, email, password, cpf]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 8
+        cpf:
+          type: string
+        phone:
+          type: string
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+    RefreshTokenRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+    AuthResponse:
+      type: object
+      required: [accessToken, refreshToken, user]
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        expiresIn:
+          type: integer
+          example: 3600
+        user:
+          $ref: '#/components/schemas/User'
+    User:
+      type: object
+      required: [id, name, email, role]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        cpf:
+          type: string
+        phone:
+          type: string
+        role:
+          type: string
+          enum: [student, admin]
+        address:
+          $ref: '#/components/schemas/Address'
+    UserSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+    Address:
+      type: object
+      properties:
+        street:
+          type: string
+        number:
+          type: string
+        complement:
+          type: string
+        neighborhood:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        zipCode:
+          type: string
+    UpdateProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        cpf:
+          type: string
+        phone:
+          type: string
+        address:
+          $ref: '#/components/schemas/Address'
+    Course:
+      type: object
+      required: [id, title, price, status, availableSeats]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        imageUrl:
+          type: string
+          format: uri
+        price:
+          type: number
+          format: decimal
+        status:
+          type: string
+          enum: [draft, published, archived]
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        location:
+          type: string
+        instructor:
+          type: string
+        availableSeats:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    SaveCourseRequest:
+      type: object
+      required: [title, price, status, availableSeats]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        imageUrl:
+          type: string
+          format: uri
+        price:
+          type: number
+          format: decimal
+        status:
+          type: string
+          enum: [draft, published, archived]
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        location:
+          type: string
+        instructor:
+          type: string
+        availableSeats:
+          type: integer
+          minimum: 0
+    CreateOrderRequest:
+      type: object
+      required: [items, paymentMethod]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/CreateOrderItem'
+        paymentMethod:
+          $ref: '#/components/schemas/PaymentMethod'
+        installments:
+          type: integer
+          minimum: 1
+        promoCode:
+          type: string
+    CreateOrderItem:
+      type: object
+      required: [courseId, quantity]
+      properties:
+        courseId:
+          type: integer
+        quantity:
+          type: integer
+          minimum: 1
+    Order:
+      type: object
+      required: [id, status, paymentStatus, total, items]
+      properties:
+        id:
+          type: integer
+        user:
+          $ref: '#/components/schemas/UserSummary'
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        paymentStatus:
+          $ref: '#/components/schemas/PaymentStatus'
+        paymentMethod:
+          $ref: '#/components/schemas/PaymentMethod'
+        subtotal:
+          type: number
+          format: decimal
+        discountTotal:
+          type: number
+          format: decimal
+        total:
+          type: number
+          format: decimal
+        promoCode:
+          type: string
+        gatewayPaymentId:
+          type: string
+        pixQrCode:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        createdAt:
+          type: string
+          format: date-time
+        paidAt:
+          type: string
+          format: date-time
+    OrderItem:
+      type: object
+      required: [courseId, title, quantity, unitPrice]
+      properties:
+        courseId:
+          type: integer
+        title:
+          type: string
+        quantity:
+          type: integer
+        unitPrice:
+          type: number
+          format: decimal
+    StudentCourse:
+      type: object
+      required: [course, enrollmentStatus, progress]
+      properties:
+        course:
+          $ref: '#/components/schemas/Course'
+        enrollmentStatus:
+          type: string
+          enum: [active, completed, cancelled]
+        progress:
+          $ref: '#/components/schemas/CourseProgress'
+        accessUntil:
+          type: string
+          format: date-time
+    CourseProgress:
+      type: object
+      required: [courseId, percent]
+      properties:
+        courseId:
+          type: integer
+        percent:
+          type: number
+          minimum: 0
+          maximum: 100
+        completedLessons:
+          type: array
+          items:
+            type: integer
+        lastSeenAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+    UpdateProgressRequest:
+      type: object
+      required: [percent]
+      properties:
+        percent:
+          type: number
+          minimum: 0
+          maximum: 100
+        completedLessonId:
+          type: integer
+    PaymentWebhook:
+      type: object
+      required: [eventId, paymentId, status]
+      properties:
+        eventId:
+          type: string
+        paymentId:
+          type: string
+        orderId:
+          type: integer
+        status:
+          $ref: '#/components/schemas/PaymentStatus'
+        rawPayload:
+          type: object
+          additionalProperties: true
+    PromoCode:
+      type: object
+      properties:
+        id:
+          type: integer
+        code:
+          type: string
+        discount:
+          type: number
+          format: decimal
+        discountType:
+          type: string
+          enum: [percentage, fixed]
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        isActive:
+          type: boolean
+        usageLimit:
+          type: integer
+        usageCount:
+          type: integer
+    SavePromoCodeRequest:
+      type: object
+      required: [code, discount, discountType, startDate, endDate]
+      properties:
+        code:
+          type: string
+        discount:
+          type: number
+          format: decimal
+        discountType:
+          type: string
+          enum: [percentage, fixed]
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        isActive:
+          type: boolean
+        usageLimit:
+          type: integer
+    Student:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        enrollments:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudentCourse'
+    PaymentMethod:
+      type: string
+      enum: [credit_card, debit_card, pix]
+    PaymentStatus:
+      type: string
+      enum: [pending, paid, refused, cancelled, refunded]
+    OrderStatus:
+      type: string
+      enum: [pending, processing, completed, cancelled]
+    UpdateOrderStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+    PagedCourses:
+      allOf:
+        - $ref: '#/components/schemas/PagedResult'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Course'
+    PagedOrders:
+      allOf:
+        - $ref: '#/components/schemas/PagedResult'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Order'
+    PagedStudents:
+      allOf:
+        - $ref: '#/components/schemas/PagedResult'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Student'
+    PagedResult:
+      type: object
+      required: [page, pageSize, totalItems, totalPages]
+      properties:
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        totalItems:
+          type: integer
+        totalPages:
+          type: integer
+security:
+  - bearerAuth: []
