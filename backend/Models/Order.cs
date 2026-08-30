@@ -15,6 +15,7 @@ namespace EquipamentosMedicosApi.Models
         public string PromoCode { get; set; } = string.Empty;
         public string? GatewayPaymentId { get; set; }
         public DateTime? PaidAt { get; set; }
+        public string? IdempotencyKey { get; set; }
 
         // Relacionamentos
         public User? Usuario {get; set;}

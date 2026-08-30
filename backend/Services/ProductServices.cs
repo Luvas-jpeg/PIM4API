@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using EquipamentosMedicosApi.Data;
 using EquipamentosMedicosApi.DTOs;
 using EquipamentosMedicosApi.Models;
@@ -16,11 +17,11 @@ public class ProductService
 
     public async Task<List<ProductResponseDTO>> GetAllAsync(string? tipo)
     {
-        var query = _context.Products.AsQueryable();
+        var query = _context.Products.Where(product => product.TipoProduto == "course");
 
-        if (!string.IsNullOrWhiteSpace(tipo))
+        if (!string.IsNullOrWhiteSpace(tipo) && tipo != "course")
         {
-            query = query.Where(p => p.TipoProduto == tipo);
+            return [];
         }
 
         return await query
@@ -30,7 +31,8 @@ public class ProductService
 
     public async Task<ProductResponseDTO?> GetByIdAsync(int id)
     {
-        var product = await _context.Products.FirstOrDefaultAsync(p => p.Id == id);
+        var product = await _context.Products
+            .FirstOrDefaultAsync(p => p.Id == id && p.TipoProduto == "course");
 
         if (product == null)
         {
@@ -49,6 +51,12 @@ public class ProductService
         _context.Products.Add(product);
         await _context.SaveChangesAsync();
 
+        if (product.TipoProduto == "course")
+        {
+            _context.CourseClasses.Add(CreateCourseClass(product));
+            await _context.SaveChangesAsync();
+        }
+
         return ToResponse(product);
     }
 
@@ -62,6 +70,23 @@ public class ProductService
         }
 
         ApplyRequest(product, request);
+
+        if (product.TipoProduto == "course")
+        {
+            var courseClass = await _context.CourseClasses
+                .FirstOrDefaultAsync(courseClass => courseClass.ProdutoId == product.Id);
+
+            if (courseClass == null)
+            {
+                _context.CourseClasses.Add(CreateCourseClass(product));
+            }
+            else
+            {
+                courseClass.DataRealizacao = ParseCourseDate(product.Date);
+                courseClass.Local = product.Location;
+                courseClass.Instructor = product.Instructor;
+            }
+        }
 
         await _context.SaveChangesAsync();
 
@@ -138,5 +163,31 @@ public class ProductService
         product.Date = request.Date.Trim();
         product.Location = request.Location.Trim();
         product.Instructor = request.Instructor.Trim();
+    }
+
+    private static CourseClass CreateCourseClass(Product product)
+    {
+        return new CourseClass
+        {
+            ProdutoId = product.Id,
+            DataRealizacao = ParseCourseDate(product.Date),
+            Local = product.Location,
+            Instructor = product.Instructor,
+            VafasDisponiveis = product.Estoque ?? 0
+        };
+    }
+
+    private static DateTime ParseCourseDate(string date)
+    {
+        if (DateTime.TryParse(
+            date,
+            CultureInfo.GetCultureInfo("pt-BR"),
+            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+            out var parsed))
+        {
+            return parsed;
+        }
+
+        return DateTime.UtcNow;
     }
 }

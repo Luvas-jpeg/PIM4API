@@ -53,16 +53,27 @@ public class EnrollmentService
                 DataRealizacao = ParseCourseDate(product.Date),
                 Local = product.Location,
                 Instructor = product.Instructor,
-                VafasDisponiveis = (product.Estoque ?? 0) + quantity
+                VafasDisponiveis = product.Estoque ?? 0
             };
 
             _context.CourseClasses.Add(courseClass);
             await _context.SaveChangesAsync();
         }
 
-        courseClass.VafasDisponiveis = Math.Max(0, courseClass.VafasDisponiveis - quantity);
+        var existingEnrollments = await _context.Enrollments.CountAsync(enrollment =>
+            enrollment.OrderId == order.Id &&
+            enrollment.StudentId == student.Id &&
+            enrollment.ClassId == courseClass.Id);
 
-        for (var i = 0; i < quantity; i++)
+        var enrollmentsToCreate = Math.Max(0, quantity - existingEnrollments);
+        if (courseClass.VafasDisponiveis < enrollmentsToCreate)
+        {
+            throw new InvalidOperationException($"Nao ha vagas suficientes na turma do curso '{product.Nome}'.");
+        }
+
+        courseClass.VafasDisponiveis -= enrollmentsToCreate;
+
+        for (var i = 0; i < enrollmentsToCreate; i++)
         {
             _context.Enrollments.Add(new Enrollment
             {
@@ -76,18 +87,13 @@ public class EnrollmentService
 
     private static DateTime ParseCourseDate(string date)
     {
-        var firstDate = date
-            .Split('-', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .FirstOrDefault();
-
-        if (DateTime.TryParseExact(
-            firstDate,
-            "dd/MM/yyyy",
+        if (DateTime.TryParse(
+            date,
             CultureInfo.GetCultureInfo("pt-BR"),
-            DateTimeStyles.None,
+            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
             out var parsed))
         {
-            return DateTime.SpecifyKind(parsed, DateTimeKind.Utc);
+            return parsed;
         }
 
         return DateTime.UtcNow;

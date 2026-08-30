@@ -21,15 +21,35 @@ public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
             .Build();
 
         var connectionString = configuration.GetConnectionString("DefaultConnection")
-            ?? "Host=localhost;Port=5432;Database=medishop;Username=medishop;Password=medishop";
+            ?? ReadDotEnvConnectionString(currentDirectory)
+            ?? "Host=localhost;Port=5432;Database=medishop;Username=medishop;Password=medishop_dev_password";
 
-        if (string.IsNullOrWhiteSpace(connectionString))
-            connectionString = "Host=localhost;Port=5432;Database=medishop;Username=medishop;Password=medishop";
+        connectionString = connectionString.Replace("Host=postgres", "Host=localhost");
 
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(connectionString)
             .Options;
 
         return new AppDbContext(options);
+    }
+
+    private static string? ReadDotEnvConnectionString(string currentDirectory)
+    {
+        var envPath = new[]
+        {
+            Path.Combine(currentDirectory, ".env"),
+            Path.Combine(currentDirectory, "..", ".env")
+        }.FirstOrDefault(File.Exists);
+
+        if (envPath == null)
+        {
+            return null;
+        }
+
+        var line = File.ReadLines(envPath)
+            .FirstOrDefault(value =>
+                value.StartsWith("ConnectionStrings__DefaultConnection=", StringComparison.Ordinal));
+
+        return line?[(line.IndexOf('=') + 1)..].Trim().Trim('"');
     }
 }

@@ -32,13 +32,38 @@ public class OrderService
         _enrollmentService = enrollmentService;
     }
 
-    public async Task<ServiceResult<CreateOrderResponse>> CreateAsync(int userId, CreateOrderDTO request)
+    public async Task<ServiceResult<CreateOrderResponse>> CreateAsync(
+        int userId,
+        CreateOrderDTO request,
+        string? idempotencyKey = null)
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.ID == userId);
 
         if (user == null)
         {
             return ServiceResult<CreateOrderResponse>.Fail("Usuario nao encontrado.");
+        }
+
+        idempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey)
+            ? null
+            : idempotencyKey.Trim();
+
+        if (idempotencyKey != null)
+        {
+            var existingOrder = await _context.Orders
+                .FirstOrDefaultAsync(order =>
+                    order.UsuarioId == userId &&
+                    order.IdempotencyKey == idempotencyKey);
+
+            if (existingOrder != null)
+            {
+                return ServiceResult<CreateOrderResponse>.Ok(new CreateOrderResponse
+                {
+                    Message = "Pedido ja criado anteriormente.",
+                    OrderId = existingOrder.Id,
+                    Total = existingOrder.Total
+                });
+            }
         }
 
         var paymentMethod = request.PaymentMethod.Trim().ToLower();
@@ -80,6 +105,7 @@ public class OrderService
             DataPedido = DateTime.UtcNow,
             Status = "pending",
             PaymentStatus = "pending",
+            IdempotencyKey = idempotencyKey,
             ValorFrete = request.ValorFrete,
             PaymentMethod = paymentMethod,
             Installments = paymentMethod == "credit_card" ? request.Installments : null,
@@ -102,18 +128,6 @@ public class OrderService
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
 
-        foreach (var item in request.Itens)
-        {
-            var product = products[item.ProdutoId];
-
-            await _enrollmentService.CreateEnrollmentsForCourseAsync(
-                user,
-                product,
-                order,
-                item.Quantidade);
-        }
-
-        await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 
         return ServiceResult<CreateOrderResponse>.Ok(new CreateOrderResponse
@@ -156,6 +170,9 @@ public class OrderService
             Id = order.Id,
             DataPedido = order.DataPedido,
             Status = order.Status,
+            PaymentStatus = order.PaymentStatus,
+            GatewayPaymentId = order.GatewayPaymentId,
+            PaidAt = order.PaidAt,
             Total = order.Total,
             ValorFrete = order.ValorFrete,
             PaymentMethod = order.PaymentMethod,
@@ -178,6 +195,132 @@ public class OrderService
         return ServiceResult<List<OrderResponse>>.Ok(response);
     }
 
+    public async Task<ServiceResult<OrderResponse>> GetByIdAsync(int userId, int orderId, bool isAdmin = false)
+    {
+        var query = _context.Orders
+            .Include(order => order.Usuario)
+            .Include(order => order.Itens)
+                .ThenInclude(item => item.Produto)
+            .Where(order => order.Id == orderId);
+
+        if (!isAdmin)
+        {
+            query = query.Where(order => order.UsuarioId == userId);
+        }
+
+        var order = await query.FirstOrDefaultAsync();
+        return order == null
+            ? ServiceResult<OrderResponse>.Fail("Pedido nao encontrado.")
+            : ServiceResult<OrderResponse>.Ok(ToResponse(order));
+    }
+
+    public async Task<ServiceResult<OrderResponse>> CancelAsync(int userId, int orderId)
+    {
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        var order = await _context.Orders
+            .Include(item => item.Itens)
+            .FirstOrDefaultAsync(item => item.Id == orderId && item.UsuarioId == userId);
+
+        if (order == null)
+            return ServiceResult<OrderResponse>.Fail("Pedido nao encontrado.");
+
+        if (order.PaymentStatus == "paid" || order.Status is "completed" or "cancelled")
+            return ServiceResult<OrderResponse>.Fail("Pedido nao pode ser cancelado.");
+
+        await ReleaseStockAsync(order);
+        order.Status = "cancelled";
+        order.PaymentStatus = "cancelled";
+
+        await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        return ServiceResult<OrderResponse>.Ok(ToResponse(order));
+    }
+
+    public async Task<ServiceResult<OrderResponse>> ProcessPaymentWebhookAsync(int orderId, string paymentId, string paymentStatus)
+    {
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        var order = await _context.Orders
+            .Include(item => item.Itens)
+                .ThenInclude(item => item.Produto)
+            .Include(item => item.Usuario)
+            .FirstOrDefaultAsync(item => item.Id == orderId);
+
+        if (order == null)
+            return ServiceResult<OrderResponse>.Fail("Pedido nao encontrado.");
+
+        var normalizedStatus = paymentStatus.Trim().ToLowerInvariant();
+        if (normalizedStatus is not ("paid" or "refused" or "cancelled" or "refunded"))
+            return ServiceResult<OrderResponse>.Fail("Status de pagamento invalido.");
+
+        if (order.PaymentStatus == "paid" && normalizedStatus != "refunded")
+            return ServiceResult<OrderResponse>.Ok(ToResponse(order));
+
+        if (!string.IsNullOrWhiteSpace(paymentId))
+            order.GatewayPaymentId = paymentId;
+
+        if (normalizedStatus == "paid")
+        {
+            if (order.PaymentStatus != "paid")
+            {
+                order.PaymentStatus = "paid";
+                order.Status = "processing";
+                order.PaidAt = DateTime.UtcNow;
+
+                foreach (var item in order.Itens)
+                {
+                    if (item.Produto != null)
+                    {
+                        await _enrollmentService.CreateEnrollmentsForCourseAsync(
+                            order.Usuario!,
+                            item.Produto,
+                            order,
+                            item.Quantidade);
+                    }
+                }
+            }
+        }
+        else
+        {
+            if (order.PaymentStatus != normalizedStatus && order.PaymentStatus != "paid")
+                await ReleaseStockAsync(order);
+
+            if (normalizedStatus == "refunded")
+            {
+                var enrollments = await _context.Enrollments
+                    .Where(enrollment => enrollment.OrderId == order.Id)
+                    .ToListAsync();
+
+                foreach (var enrollment in enrollments)
+                    enrollment.Status = "cancelled";
+            }
+
+            order.PaymentStatus = normalizedStatus;
+            order.Status = "cancelled";
+        }
+
+        await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        return ServiceResult<OrderResponse>.Ok(ToResponse(order));
+    }
+
+    private async Task ReleaseStockAsync(Order order)
+    {
+        var productIds = order.Itens.Select(item => item.ProdutoId).Distinct().ToList();
+        var products = await _context.Products
+            .Where(product => productIds.Contains(product.Id))
+            .ToDictionaryAsync(product => product.Id);
+
+        foreach (var item in order.Itens)
+        {
+            if (products.TryGetValue(item.ProdutoId, out var product))
+                product.Estoque = (product.Estoque ?? 0) + item.Quantidade;
+        }
+    }
+
     public async Task<List<OrderResponse>> GetAllAsync()
     {
         var orders = await _context.Orders
@@ -192,6 +335,9 @@ public class OrderService
             Id = order.Id,
             DataPedido = order.DataPedido,
             Status = order.Status,
+            PaymentStatus = order.PaymentStatus,
+            GatewayPaymentId = order.GatewayPaymentId,
+            PaidAt = order.PaidAt,
             Total = order.Total,
             ValorFrete = order.ValorFrete,
             PaymentMethod = order.PaymentMethod,
@@ -239,5 +385,37 @@ public class OrderService
             order.Id,
             order.Status
         });
+    }
+
+    private static OrderResponse ToResponse(Order order)
+    {
+        return new OrderResponse
+        {
+            Id = order.Id,
+            DataPedido = order.DataPedido,
+            Status = order.Status,
+            PaymentStatus = order.PaymentStatus,
+            GatewayPaymentId = order.GatewayPaymentId,
+            PaidAt = order.PaidAt,
+            Total = order.Total,
+            ValorFrete = order.ValorFrete,
+            PaymentMethod = order.PaymentMethod,
+            Installments = order.Installments,
+            PromoCode = order.PromoCode,
+            Usuario = order.Usuario == null ? null : new OrderUserResponse
+            {
+                Id = order.Usuario.ID,
+                Nome = order.Usuario.Nome,
+                Email = order.Usuario.Email
+            },
+            Itens = order.Itens.Select(item => new OrderItemResponse
+            {
+                ProdutoId = item.ProdutoId,
+                Nome = item.Produto?.Nome ?? string.Empty,
+                TipoProduto = item.Produto?.TipoProduto ?? "equipment",
+                Quantidade = item.Quantidade,
+                PrecoUnitario = item.PrecoUnitario
+            }).ToList()
+        };
     }
 }

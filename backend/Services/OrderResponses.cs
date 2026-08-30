@@ -17,6 +17,9 @@ public class OrderResponse
     public string PaymentMethod {get; set;} = string.Empty;
     public int? Installments {get; set;}
     public string PromoCode {get; set;} = string.Empty;
+    public string PaymentStatus { get; set; } = string.Empty;
+    public string? GatewayPaymentId { get; set; }
+    public DateTime? PaidAt { get; set; }
     public OrderUserResponse? Usuario {get; set;}
     public List<OrderItemResponse> Itens {get; set;} = new();
 

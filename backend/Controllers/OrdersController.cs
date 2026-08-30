@@ -29,14 +29,15 @@ namespace EquipamentosMedicosApi.Controllers
                 return Unauthorized();
             }
 
-            var result = await _orderService.CreateAsync(userId.Value, request);
+            var idempotencyKey = Request.Headers["Idempotency-Key"].FirstOrDefault();
+            var result = await _orderService.CreateAsync(userId.Value, request, idempotencyKey);
 
             if (!result.Success)
             {
                 return BadRequest(new { message = result.Error });
             }
 
-            return CreatedAtAction(nameof(GetMyOrders), new { id = result.Data!.OrderId }, result.Data);
+            return CreatedAtAction(nameof(GetById), new { id = result.Data!.OrderId }, result.Data);
         }
 
         [HttpGet("my")]
@@ -57,6 +58,53 @@ namespace EquipamentosMedicosApi.Controllers
             }
 
             return Ok(result.Data);
+        }
+
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(int id)
+        {
+            var userId = GetAuthenticatedUserId();
+            if (userId == null)
+                return Unauthorized();
+
+            var result = await _orderService.GetByIdAsync(userId.Value, id);
+            return result.Success ? Ok(result.Data) : NotFound(new { message = result.Error });
+        }
+
+        [HttpPost("{id}/cancel")]
+        public async Task<IActionResult> Cancel(int id)
+        {
+            var userId = GetAuthenticatedUserId();
+            if (userId == null)
+                return Unauthorized();
+
+            var result = await _orderService.CancelAsync(userId.Value, id);
+            if (!result.Success)
+                return BadRequest(new { message = result.Error });
+
+            return Ok(result.Data);
+        }
+
+        [HttpGet("{id}/payment")]
+        public async Task<IActionResult> GetPayment(int id)
+        {
+            var userId = GetAuthenticatedUserId();
+            if (userId == null)
+                return Unauthorized();
+
+            var result = await _orderService.GetByIdAsync(userId.Value, id);
+            if (!result.Success)
+                return NotFound(new { message = result.Error });
+
+            return Ok(new
+            {
+                orderId = result.Data!.Id,
+                status = result.Data.PaymentStatus,
+                paymentMethod = result.Data.PaymentMethod,
+                gatewayPaymentId = result.Data.GatewayPaymentId,
+                paidAt = result.Data.PaidAt,
+                total = result.Data.Total
+            });
         }
 
         [HttpGet]

@@ -34,6 +34,19 @@ namespace EquipamentosMedicosApi.Data
                 .HasIndex(refreshToken => refreshToken.Token)
                 .IsUnique();
 
+            modelBuilder.Entity<User>()
+                .HasIndex(user => user.Email)
+                .IsUnique();
+
+            modelBuilder.Entity<PromoCode>()
+                .HasIndex(promoCode => promoCode.Code)
+                .IsUnique();
+
+            modelBuilder.Entity<Order>()
+                .HasIndex(order => new { order.UsuarioId, order.IdempotencyKey })
+                .IsUnique()
+                .HasFilter("\"IdempotencyKey\" IS NOT NULL");
+
             modelBuilder.Entity<CourseProgress>()
                 .HasIndex(progress => new { progress.UserId, progress.CourseId })
                 .IsUnique();
