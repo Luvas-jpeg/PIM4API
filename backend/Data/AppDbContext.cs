@@ -9,6 +9,7 @@ namespace EquipamentosMedicosApi.Data
 
         public DbSet<User> Users { get; set; }
         public DbSet<Product> Products { get; set; }
+        public DbSet<Course> Courses { get; set; }
         public DbSet<Order> Orders { get; set; }
         public DbSet<OrderItem> OrderItems { get; set; }
         public DbSet<CourseClass> CourseClasses { get; set; }
@@ -46,6 +47,63 @@ namespace EquipamentosMedicosApi.Data
                 .HasIndex(order => new { order.UsuarioId, order.IdempotencyKey })
                 .IsUnique()
                 .HasFilter("\"IdempotencyKey\" IS NOT NULL");
+
+            modelBuilder.Entity<Course>()
+                .HasIndex(course => course.LegacyProductId)
+                .IsUnique()
+                .HasFilter("\"LegacyProductId\" IS NOT NULL");
+
+            modelBuilder.Entity<Course>()
+                .HasMany(course => course.Classes)
+                .WithOne(courseClass => courseClass.Course)
+                .HasForeignKey(courseClass => courseClass.CourseId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Course>()
+                .HasOne(course => course.LegacyProduct)
+                .WithMany()
+                .HasForeignKey(course => course.LegacyProductId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<CourseClass>()
+                .Property(courseClass => courseClass.AvailableSeats)
+                .HasDefaultValue(0);
+
+            modelBuilder.Entity<CourseClass>()
+                .Property(courseClass => courseClass.Capacity)
+                .HasDefaultValue(0);
+
+            modelBuilder.Entity<CourseClass>()
+                .Property(courseClass => courseClass.Status)
+                .HasDefaultValue("scheduled");
+
+            modelBuilder.Entity<CourseClass>()
+                .HasOne(courseClass => courseClass.Produto)
+                .WithMany(product => product.Turmas)
+                .HasForeignKey(courseClass => courseClass.ProdutoId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Enrollment>()
+                .HasOne(enrollment => enrollment.Class)
+                .WithMany(courseClass => courseClass.Enrollments)
+                .HasForeignKey(enrollment => enrollment.ClassId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Enrollment>()
+                .HasOne(enrollment => enrollment.Student)
+                .WithMany(student => student.Enrollments)
+                .HasForeignKey(enrollment => enrollment.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Enrollment>()
+                .HasOne(enrollment => enrollment.Order)
+                .WithMany(order => order.Enrollments)
+                .HasForeignKey(enrollment => enrollment.OrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Enrollment>()
+                .Property(enrollment => enrollment.EnrolledAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             modelBuilder.Entity<CourseProgress>()
                 .HasIndex(progress => new { progress.UserId, progress.CourseId })

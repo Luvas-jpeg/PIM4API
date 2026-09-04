@@ -54,6 +54,7 @@ public class ProductService
         if (product.TipoProduto == "course")
         {
             _context.CourseClasses.Add(CreateCourseClass(product));
+            _context.Courses.Add(CreateCourse(product));
             await _context.SaveChangesAsync();
         }
 
@@ -73,6 +74,21 @@ public class ProductService
 
         if (product.TipoProduto == "course")
         {
+            var course = await _context.Courses
+                .FirstOrDefaultAsync(course => course.LegacyProductId == product.Id);
+            if (course == null)
+            {
+                _context.Courses.Add(CreateCourse(product));
+            }
+            else
+            {
+                course.Nome = product.Nome;
+                course.Description = product.Description;
+                course.Preco = product.Preco;
+                course.Image = product.Image;
+                course.Category = product.Category;
+            }
+
             var courseClass = await _context.CourseClasses
                 .FirstOrDefaultAsync(courseClass => courseClass.ProdutoId == product.Id);
 
@@ -85,6 +101,8 @@ public class ProductService
                 courseClass.DataRealizacao = ParseCourseDate(product.Date);
                 courseClass.Local = product.Location;
                 courseClass.Instructor = product.Instructor;
+                courseClass.AvailableSeats = product.Estoque ?? 0;
+                courseClass.VafasDisponiveis = courseClass.AvailableSeats;
             }
         }
 
@@ -173,7 +191,23 @@ public class ProductService
             DataRealizacao = ParseCourseDate(product.Date),
             Local = product.Location,
             Instructor = product.Instructor,
-            VafasDisponiveis = product.Estoque ?? 0
+            VafasDisponiveis = product.Estoque ?? 0,
+            Capacity = product.Estoque ?? 0,
+            AvailableSeats = product.Estoque ?? 0
+        };
+    }
+
+    private static Course CreateCourse(Product product)
+    {
+        return new Course
+        {
+            Nome = product.Nome,
+            Description = product.Description,
+            Preco = product.Preco,
+            Image = product.Image,
+            Category = product.Category,
+            LegacyProductId = product.Id,
+            IsActive = true
         };
     }
 

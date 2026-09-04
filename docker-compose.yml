@@ -36,8 +36,8 @@ services:
 
   frontend:
     build:
-      context: .
-      dockerfile: frontend/Dockerfile
+      context: ../PIM4Front
+      dockerfile: Dockerfile
     container_name: medishop-frontend
     depends_on:
       - api

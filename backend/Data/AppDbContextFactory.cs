@@ -20,9 +20,14 @@ public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
             .AddEnvironmentVariables()
             .Build();
 
-        var connectionString = configuration.GetConnectionString("DefaultConnection")
-            ?? ReadDotEnvConnectionString(currentDirectory)
-            ?? "Host=localhost;Port=5432;Database=medishop;Username=medishop;Password=medishop_dev_password";
+        var connectionString = configuration.GetConnectionString("DefaultConnection");
+
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            connectionString = ReadDotEnvConnectionString(currentDirectory);
+        }
+
+        connectionString ??= "Host=localhost;Port=5432;Database=medishop;Username=medishop;Password=medishop_dev_password";
 
         connectionString = connectionString.Replace("Host=postgres", "Host=localhost");
 

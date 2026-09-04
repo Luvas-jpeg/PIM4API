@@ -14,7 +14,12 @@ public class EnrollmentService
         _context = context;
     }
 
-    public async Task CreateEnrollmentsForCourseAsync(User user, Product product, Order order, int quantity)
+    public async Task CreateEnrollmentsForCourseAsync(
+        User user,
+        Product product,
+        Order order,
+        int quantity,
+        int? classId = null)
     {
         if (product.TipoProduto != "course")
         {
@@ -42,8 +47,12 @@ public class EnrollmentService
             await _context.SaveChangesAsync();
         }
 
-        var courseClass = await _context.CourseClasses
-            .FirstOrDefaultAsync(c => c.ProdutoId == product.Id);
+        var courseClass = classId.HasValue
+            ? await _context.CourseClasses.FirstOrDefaultAsync(c =>
+                c.Id == classId.Value &&
+                ((c.CourseId.HasValue && c.Course!.LegacyProductId == product.Id) ||
+                 (!c.CourseId.HasValue && c.ProdutoId == product.Id)))
+            : await _context.CourseClasses.FirstOrDefaultAsync(c => c.ProdutoId == product.Id);
 
         if (courseClass == null)
         {
@@ -56,6 +65,8 @@ public class EnrollmentService
                 VafasDisponiveis = product.Estoque ?? 0
             };
 
+            courseClass.AvailableSeats = courseClass.VafasDisponiveis;
+
             _context.CourseClasses.Add(courseClass);
             await _context.SaveChangesAsync();
         }
@@ -66,12 +77,18 @@ public class EnrollmentService
             enrollment.ClassId == courseClass.Id);
 
         var enrollmentsToCreate = Math.Max(0, quantity - existingEnrollments);
-        if (courseClass.VafasDisponiveis < enrollmentsToCreate)
+        // Explicit class selection reserves its seats while creating the order.
+        // Legacy orders reserve Product stock and consume class seats on payment.
+        if (!classId.HasValue && courseClass.VafasDisponiveis < enrollmentsToCreate)
         {
             throw new InvalidOperationException($"Nao ha vagas suficientes na turma do curso '{product.Nome}'.");
         }
 
-        courseClass.VafasDisponiveis -= enrollmentsToCreate;
+        if (!classId.HasValue)
+        {
+            courseClass.VafasDisponiveis -= enrollmentsToCreate;
+            courseClass.AvailableSeats = courseClass.VafasDisponiveis;
+        }
 
         for (var i = 0; i < enrollmentsToCreate; i++)
         {

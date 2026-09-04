@@ -117,6 +117,7 @@ public class OrderService
                 return new OrderItem
                 {
                     ProdutoId = item.ProdutoId,
+                    TurmaId = item.TurmaId,
                     Quantidade = item.Quantidade,
                     PrecoUnitario = product.Preco
                 };
@@ -181,6 +182,7 @@ public class OrderService
             Itens = order.Itens.Select(item => new OrderItemResponse
             {
                 ProdutoId = item.ProdutoId,
+                TurmaId = item.TurmaId,
                 Nome = item.Produto?.Nome ?? string.Empty,
                 TipoProduto = item.Produto?.TipoProduto ?? "equipment",
                 Quantidade = item.Quantidade,
@@ -245,6 +247,8 @@ public class OrderService
         var order = await _context.Orders
             .Include(item => item.Itens)
                 .ThenInclude(item => item.Produto)
+            .Include(item => item.Itens)
+                .ThenInclude(item => item.Turma)
             .Include(item => item.Usuario)
             .FirstOrDefaultAsync(item => item.Id == orderId);
 
@@ -277,7 +281,8 @@ public class OrderService
                             order.Usuario!,
                             item.Produto,
                             order,
-                            item.Quantidade);
+                            item.Quantidade,
+                            item.TurmaId);
                     }
                 }
             }
@@ -316,7 +321,17 @@ public class OrderService
 
         foreach (var item in order.Itens)
         {
-            if (products.TryGetValue(item.ProdutoId, out var product))
+            if (item.TurmaId.HasValue)
+            {
+                var courseClass = await _context.CourseClasses
+                    .FirstOrDefaultAsync(courseClass => courseClass.Id == item.TurmaId.Value);
+                if (courseClass != null)
+                {
+                    courseClass.AvailableSeats += item.Quantidade;
+                    courseClass.VafasDisponiveis = courseClass.AvailableSeats;
+                }
+            }
+            else if (products.TryGetValue(item.ProdutoId, out var product))
                 product.Estoque = (product.Estoque ?? 0) + item.Quantidade;
         }
     }
@@ -352,6 +367,7 @@ public class OrderService
             Itens = order.Itens.Select(item => new OrderItemResponse
             {
                 ProdutoId = item.ProdutoId,
+                TurmaId = item.TurmaId,
                 Nome = item.Produto?.Nome ?? string.Empty,
                 TipoProduto = item.Produto?.TipoProduto ?? "equipment",
                 Quantidade = item.Quantidade,
@@ -411,6 +427,7 @@ public class OrderService
             Itens = order.Itens.Select(item => new OrderItemResponse
             {
                 ProdutoId = item.ProdutoId,
+                TurmaId = item.TurmaId,
                 Nome = item.Produto?.Nome ?? string.Empty,
                 TipoProduto = item.Produto?.TipoProduto ?? "equipment",
                 Quantidade = item.Quantidade,

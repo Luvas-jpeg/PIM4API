@@ -36,6 +36,7 @@ public class OrderUserResponse
 public class OrderItemResponse
 {
     public int ProdutoId { get; set; }
+    public int? TurmaId { get; set; }
 
     public string Nome { get; set; } = string.Empty;
 
