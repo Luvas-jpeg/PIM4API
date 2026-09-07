@@ -118,6 +118,163 @@ public sealed class CourseDomainTests
         Assert.Equal(course.Id, enrollment.Class!.CourseId);
     }
 
+    [Fact]
+    public async Task CoursePurchaseReservesSeatsFromTheSelectedClass()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var product = new Product
+        {
+            Nome = "Curso legado",
+            TipoProduto = "course",
+            Preco = 300m,
+            Estoque = 10
+        };
+        var course = new Course
+        {
+            Nome = product.Nome,
+            Preco = product.Preco,
+            LegacyProduct = product
+        };
+        var courseClass = new CourseClass
+        {
+            Course = course,
+            Produto = product,
+            Capacity = 5,
+            AvailableSeats = 5,
+            VafasDisponiveis = 5,
+            DataRealizacao = new DateTime(2026, 11, 1),
+            Local = "Sao Paulo",
+            Instructor = "Instrutor"
+        };
+        fixture.Context.AddRange(product, course, courseClass);
+        await fixture.Context.SaveChangesAsync();
+
+        var service = new InventoryService(fixture.Context);
+        var result = await service.ValidateAndReserveAsync(new List<CreateOrderItemDTO>
+        {
+            new() { ProdutoId = product.Id, TurmaId = courseClass.Id, Quantidade = 2 }
+        });
+
+        Assert.True(result.Success);
+        await fixture.Context.Entry(courseClass).ReloadAsync();
+        var persistedClass = await fixture.Context.CourseClasses.SingleAsync();
+        Assert.Equal(3, persistedClass.AvailableSeats);
+        Assert.Equal(3, persistedClass.VafasDisponiveis);
+    }
+
+    [Fact]
+    public async Task CoursePurchaseMustProvideAnExplicitClass()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var product = new Product
+        {
+            Nome = "Curso sem turma",
+            TipoProduto = "course",
+            Preco = 300m,
+            Estoque = 10
+        };
+        var course = new Course
+        {
+            Nome = product.Nome,
+            Preco = product.Preco,
+            LegacyProduct = product
+        };
+        fixture.Context.AddRange(product, course);
+        await fixture.Context.SaveChangesAsync();
+
+        var service = new InventoryService(fixture.Context);
+        var result = await service.ValidateAndReserveAsync(new List<CreateOrderItemDTO>
+        {
+            new() { ProdutoId = product.Id, Quantidade = 1 }
+        });
+
+        Assert.False(result.Success);
+        Assert.Contains("exige", result.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CoursePurchaseRejectsAClassFromAnotherCourse()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var firstProduct = new Product { Nome = "Primeiro curso", TipoProduto = "course", Preco = 100m };
+        var secondProduct = new Product { Nome = "Segundo curso", TipoProduto = "course", Preco = 100m };
+        var firstCourse = new Course { Nome = firstProduct.Nome, Preco = firstProduct.Preco, LegacyProduct = firstProduct };
+        var secondCourse = new Course { Nome = secondProduct.Nome, Preco = secondProduct.Preco, LegacyProduct = secondProduct };
+        var secondClass = new CourseClass
+        {
+            Course = secondCourse,
+            Produto = secondProduct,
+            Capacity = 5,
+            AvailableSeats = 5,
+            VafasDisponiveis = 5,
+            DataRealizacao = new DateTime(2026, 11, 1),
+            Local = "Sao Paulo",
+            Instructor = "Instrutor"
+        };
+        fixture.Context.AddRange(firstProduct, secondProduct, firstCourse, secondCourse, secondClass);
+        await fixture.Context.SaveChangesAsync();
+
+        var service = new InventoryService(fixture.Context);
+        var result = await service.ValidateAndReserveAsync(new List<CreateOrderItemDTO>
+        {
+            new() { ProdutoId = firstProduct.Id, TurmaId = secondClass.Id, Quantidade = 1 }
+        });
+
+        Assert.False(result.Success);
+        Assert.Contains("nao pertence", result.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task PublicCatalogReturnsOnlyActiveCoursesWithAvailableFutureClasses()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var availableCourse = new Course
+        {
+            Nome = "Curso disponivel",
+            Preco = 100m,
+            Category = "Formacao",
+            IsActive = true
+        };
+        var inactiveCourse = new Course
+        {
+            Nome = "Curso arquivado",
+            Preco = 100m,
+            Category = "Formacao",
+            IsActive = false
+        };
+
+        fixture.Context.AddRange(availableCourse, inactiveCourse);
+        await fixture.Context.SaveChangesAsync();
+        fixture.Context.CourseClasses.AddRange(
+            new CourseClass
+            {
+                CourseId = availableCourse.Id,
+                DataRealizacao = DateTime.UtcNow.AddDays(10),
+                Status = "scheduled",
+                AvailableSeats = 3,
+                VafasDisponiveis = 3,
+                Capacity = 3,
+                Local = "Sao Paulo"
+            },
+            new CourseClass
+            {
+                CourseId = inactiveCourse.Id,
+                DataRealizacao = DateTime.UtcNow.AddDays(10),
+                Status = "scheduled",
+                AvailableSeats = 3,
+                VafasDisponiveis = 3,
+                Capacity = 3,
+                Local = "Sao Paulo"
+            });
+        await fixture.Context.SaveChangesAsync();
+
+        var result = await new CourseService(fixture.Context).GetCatalogAsync(new CourseCatalogQueryDTO());
+
+        Assert.Single(result.Items);
+        Assert.Equal(availableCourse.Id, result.Items[0].Id);
+        Assert.Equal(3, result.Items[0].Classes[0].AvailableSeats);
+    }
+
     private sealed class TestFixture : IAsyncDisposable
     {
         private readonly DbConnection _connection;

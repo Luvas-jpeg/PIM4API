@@ -207,12 +207,32 @@ O backend filtra produtos para aceitar somente `TipoProduto = course`. O catalog
 ## Retomada em 04/09/2026
 
 - Build do backend validado com `dotnet build .\backend\backend.csproj --no-restore --nologo /p:UseSharedCompilation=false`.
-- Testes do backend aprovados: 6 testes.
+- Testes do backend aprovados: 11 testes.
 - Build do frontend aprovado com `npm run build`.
 - Catalogo publico migrado de `ProductService` para `CourseService`.
 - Detalhes publicos do curso agora carregam `Course` e suas turmas diretamente.
 - Reserva de vagas ajustada para atualizacao condicional atomica no PostgreSQL, evitando decremento concorrente da mesma vaga.
 - O Docker nao estava disponivel nesta maquina durante a validacao; nenhum volume foi alterado.
+- Painel administrativo migrado para carregar e editar cursos pelo `CourseService`.
+- Painel administrativo agora exibe uma entrada por turma real, com data, local, instrutor, capacidade e vagas.
+- Consulta de alunos do painel migrada para `GET /api/courses/{courseId}/classes/{classId}/students`.
+- Exclusao destrutiva de cursos foi bloqueada no frontend e o endpoint legado de produtos agora rejeita exclusao quando existe turma, curso ou historico de pedido.
+- Painel administrativo agora permite criar e editar turmas usando os endpoints de classes do `CourseService`.
+- O formulario de turma envia data inicial/final, local, instrutor, capacidade e status.
+- Interceptor do frontend agora anexa corretamente o JWT e tenta renovar o access token uma vez ao receber `401`.
+- O painel administrativo exibe mensagens especificas para sessao expirada, falta de autorizacao e erros de cadastro.
+- Erros de criacao e edicao de cursos, turmas e cupons agora aparecem dentro do formulario/modal correspondente, sem ocupar o feedback global do painel.
+- Formulario de cursos, turmas e cupons agora identifica campos obrigatorios com `*`, marca campos opcionais e usa atributos de acessibilidade `required`/`aria-required`.
+- Regras de compra agora exigem turma explicita para cursos migrados para `Course`, preservando o fluxo legado de produtos de curso ainda nao migrados.
+- Testes de negocio adicionados para reserva de vagas, compra sem turma e turma pertencente a outro curso.
+- Testes do frontend atualizados para o catalogo baseado em `CourseService` e para o checkout com turma explicita.
+- Checkout agora possui cobertura para envio de `turmaId` e bloqueio de cursos sem turma selecionada.
+- Webhooks de recusa, cancelamento e reembolso liberam vagas; reembolsos cancelam matriculas e sao idempotentes.
+- O arquivamento logico usa `Course.IsActive` para cursos e `CourseClass.Status` (`scheduled`, `completed` ou `cancelled`) para turmas, sem exclusao de historico.
+- Etapa 2 iniciada: criado endpoint publico paginado `GET /api/courses/catalog` com busca, categoria, cidade/local, periodo, disponibilidade e ordenacao por data, preco ou nome.
+- Catalogo do frontend passou a consumir o endpoint paginado e exibir filtros, ordenacao, estados de carregamento/erro e navegacao entre paginas.
+- Cards do catalogo agora exibem a proxima turma, data, local e vagas disponiveis; cursos sem turma elegivel mostram aviso de indisponibilidade.
+- Detalhes do curso agora consideram somente turmas agendadas, futuras e com vagas para selecao e compra.
 
 ## Painel administrativo atual
 
@@ -220,7 +240,7 @@ O painel ja foi reformulado para trabalhar somente com cursos:
 
 - Cadastro de cursos em modal;
 - Lista de cursos cadastrados;
-- Edicao e exclusao;
+- Edicao e arquivamento;
 - Cards de turmas;
 - Modal com alunos matriculados;
 - Cadastro e edicao de cupons;
@@ -234,7 +254,7 @@ src\app\features\admin\admin.html
 src\app\features\admin\admin.scss
 ```
 
-O painel ainda usa `StudentsController` e associa alunos por `Student.CourseId`. O ideal e evoluir para carregar os alunos pelo endpoint especifico da turma:
+O painel carrega alunos pelo endpoint especifico da turma:
 
 ```http
 GET /api/courses/{courseId}/classes/{classId}/students
@@ -377,6 +397,11 @@ compatibilidade durante a transicao.
 - Adicionar arquivamento logico de cursos e turmas;
 - Impedir exclusao destrutiva de dados com historico financeiro.
 
+Implementacao concluida no codigo e coberta por testes. A validacao final de
+migrations, constraints e concorrencia no PostgreSQL real permanece bloqueada
+ate que o Docker Engine/ambiente PostgreSQL esteja disponivel, sem apagar o
+volume existente.
+
 ### Criterios de conclusao
 
 - Nenhum pedido novo de curso e criado sem `TurmaId`;
@@ -405,6 +430,18 @@ dependencia funcional do modelo legado de equipamentos.
 - Exibir quantidade de vagas e status da turma;
 - Validar limite maximo de inscricoes por comprador;
 - Padronizar respostas de erro e validacao.
+
+Primeiro bloco implementado:
+
+- `GET /api/courses/catalog` retorna somente cursos ativos com turmas futuras,
+  agendadas e disponiveis por padrao;
+- filtros de busca, categoria, cidade/local, periodo e disponibilidade;
+- ordenacao por proxima turma, preco ou nome;
+- paginação com tamanho limitado a 50 itens;
+- o frontend usa `CourseService.getCatalog()` e preserva `CourseService.getAll()`
+  para o painel administrativo.
+- cards publicos exibem a proxima turma, local, data e quantidade de vagas;
+- detalhes ocultam turmas passadas, canceladas ou lotadas da selecao de compra.
 
 ### Frontend
 

@@ -69,6 +69,14 @@ namespace EquipamentosMedicosApi.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)
         {
+            if (await _productService.HasFinancialHistoryAsync(id))
+            {
+                return Conflict(new
+                {
+                    message = "Produto com historico nao pode ser excluido. Arquive o curso em vez de remove-lo."
+                });
+            }
+
             var deleted = await _productService.DeleteAsync(id);
 
             if (!deleted)

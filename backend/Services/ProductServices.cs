@@ -126,6 +126,13 @@ public class ProductService
         return true;
     }
 
+    public async Task<bool> HasFinancialHistoryAsync(int id)
+    {
+        return await _context.OrderItems.AnyAsync(item => item.ProdutoId == id)
+            || await _context.CourseClasses.AnyAsync(courseClass => courseClass.ProdutoId == id)
+            || await _context.Courses.AnyAsync(course => course.LegacyProductId == id);
+    }
+
     public string? ValidateRequest(ProductRequestDTO request)
     {
         if (string.IsNullOrWhiteSpace(request.Nome))

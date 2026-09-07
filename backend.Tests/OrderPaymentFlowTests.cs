@@ -58,6 +58,40 @@ public sealed class OrderPaymentFlowTests
         Assert.Equal(2, (await fixture.Context.Products.SingleAsync(product => product.Id == fixture.CourseId)).Estoque);
     }
 
+    [Fact]
+    public async Task RefundingPaidOrderCancelsEnrollmentsAndReleasesStockOnlyOnce()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var service = fixture.CreateOrderService();
+        var orderResult = await service.CreateAsync(fixture.UserId, CreateRequest());
+
+        await service.ProcessPaymentWebhookAsync(orderResult.Data!.OrderId, "gateway-payment-2", "paid");
+        var refund = await service.ProcessPaymentWebhookAsync(orderResult.Data.OrderId, "gateway-payment-2", "refunded");
+        var repeatedRefund = await service.ProcessPaymentWebhookAsync(orderResult.Data.OrderId, "gateway-payment-2", "refunded");
+
+        Assert.True(refund.Success);
+        Assert.True(repeatedRefund.Success);
+        Assert.Equal(1, await fixture.Context.Enrollments.CountAsync());
+        Assert.All(await fixture.Context.Enrollments.ToListAsync(), enrollment =>
+            Assert.Equal("cancelled", enrollment.Status));
+        Assert.Equal(2, (await fixture.Context.Products.SingleAsync(product => product.Id == fixture.CourseId)).Estoque);
+    }
+
+    [Fact]
+    public async Task RefusedPaymentReleasesReservedStock()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var service = fixture.CreateOrderService();
+        var orderResult = await service.CreateAsync(fixture.UserId, CreateRequest());
+
+        var result = await service.ProcessPaymentWebhookAsync(
+            orderResult.Data!.OrderId, "gateway-payment-3", "refused");
+
+        Assert.True(result.Success);
+        Assert.Equal(0, await fixture.Context.Enrollments.CountAsync());
+        Assert.Equal(2, (await fixture.Context.Products.SingleAsync(product => product.Id == fixture.CourseId)).Estoque);
+    }
+
     private static CreateOrderDTO CreateRequest()
     {
         return new CreateOrderDTO

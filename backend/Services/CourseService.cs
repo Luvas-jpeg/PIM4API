@@ -30,6 +30,69 @@ public class CourseService
             .ToList();
     }
 
+    public async Task<PagedCourseResponseDTO> GetCatalogAsync(CourseCatalogQueryDTO request)
+    {
+        var page = Math.Max(1, request.Page);
+        var pageSize = Math.Clamp(request.PageSize, 1, 50);
+        var today = DateTime.UtcNow;
+        var classes = _context.CourseClasses
+            .Where(courseClass =>
+                courseClass.Status == "scheduled" &&
+                courseClass.DataRealizacao >= today &&
+                (!request.AvailableOnly || courseClass.AvailableSeats > 0));
+
+        if (!string.IsNullOrWhiteSpace(request.City))
+            classes = classes.Where(courseClass => courseClass.Local.Contains(request.City));
+        if (request.StartDate.HasValue)
+            classes = classes.Where(courseClass => courseClass.DataRealizacao >= request.StartDate.Value);
+        if (request.EndDate.HasValue)
+            classes = classes.Where(courseClass => courseClass.DataRealizacao <= request.EndDate.Value);
+
+        var query = _context.Courses
+            .Where(course => course.IsActive)
+            .Where(course => !string.IsNullOrWhiteSpace(request.Category)
+                ? course.Category == request.Category
+                : true)
+            .Where(course => string.IsNullOrWhiteSpace(request.Search)
+                || course.Nome.Contains(request.Search)
+                || course.Description.Contains(request.Search))
+            .Where(course => course.Classes.Any(courseClass => classes.Any(item => item.Id == courseClass.Id)))
+            .Include(course => course.Classes)
+            .AsNoTracking();
+
+        var sort = request.Sort.Trim().ToLowerInvariant();
+        query = sort switch
+        {
+            "price-asc" => query.OrderBy(course => course.Preco),
+            "price-desc" => query.OrderByDescending(course => course.Preco),
+            "name" => query.OrderBy(course => course.Nome),
+            _ => query.OrderBy(course => course.Classes
+                .Where(courseClass => classes.Any(item => item.Id == courseClass.Id))
+                .Min(courseClass => courseClass.DataRealizacao))
+        };
+
+        var totalItems = await query.CountAsync();
+        var items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        foreach (var course in items)
+            course.Classes = course.Classes
+                .Where(courseClass => classes.Any(item => item.Id == courseClass.Id))
+                .OrderBy(courseClass => courseClass.DataRealizacao)
+                .ToList();
+
+        return new PagedCourseResponseDTO
+        {
+            Items = items.Select(ToResponse).ToList(),
+            Page = page,
+            PageSize = pageSize,
+            TotalItems = totalItems,
+            TotalPages = (int)Math.Ceiling(totalItems / (double)pageSize)
+        };
+    }
+
     public async Task<CourseResponseDTO?> GetByIdAsync(int id, bool includeInactive = false)
     {
         var course = await _context.Courses

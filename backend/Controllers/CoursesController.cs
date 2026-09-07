@@ -20,6 +20,10 @@ public class CoursesController : ControllerBase
     public async Task<IActionResult> GetAll([FromQuery] bool includeInactive = false)
         => Ok(await _courseService.GetAllAsync(includeInactive));
 
+    [HttpGet("catalog")]
+    public async Task<IActionResult> GetCatalog([FromQuery] CourseCatalogQueryDTO request)
+        => Ok(await _courseService.GetCatalogAsync(request));
+
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id, [FromQuery] bool includeInactive = false)
     {

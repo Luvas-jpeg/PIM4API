@@ -289,7 +289,8 @@ public class OrderService
         }
         else
         {
-            if (order.PaymentStatus != normalizedStatus && order.PaymentStatus != "paid")
+            if (order.PaymentStatus != normalizedStatus &&
+                (order.PaymentStatus != "paid" || normalizedStatus == "refunded"))
                 await ReleaseStockAsync(order);
 
             if (normalizedStatus == "refunded")

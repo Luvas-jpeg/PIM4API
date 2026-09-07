@@ -45,3 +45,25 @@ public class CourseClassRequestDTO
     public int Capacity { get; set; }
     public string Status { get; set; } = "scheduled";
 }
+
+public class CourseCatalogQueryDTO
+{
+    public string? Search { get; set; }
+    public string? Category { get; set; }
+    public string? City { get; set; }
+    public DateTime? StartDate { get; set; }
+    public DateTime? EndDate { get; set; }
+    public bool AvailableOnly { get; set; } = true;
+    public string Sort { get; set; } = "date";
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 9;
+}
+
+public class PagedCourseResponseDTO
+{
+    public List<CourseResponseDTO> Items { get; set; } = new();
+    public int Page { get; set; }
+    public int PageSize { get; set; }
+    public int TotalItems { get; set; }
+    public int TotalPages { get; set; }
+}

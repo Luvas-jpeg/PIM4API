@@ -1,4 +1,6 @@
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using EquipamentosMedicosApi.Data;
 
 #nullable disable
 
@@ -9,6 +11,7 @@ namespace backend.Migrations;
 /// legacy Product row. Existing product-backed classes remain unchanged.
 /// </summary>
 [Migration("20260904090000_AllowCourseClassesWithoutLegacyProduct")]
+[DbContext(typeof(AppDbContext))]
 public partial class AllowCourseClassesWithoutLegacyProduct : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)

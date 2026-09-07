@@ -42,6 +42,15 @@ public class InventoryService
                 return ServiceResult<Dictionary<int, Product>>.Fail("Quantidade deve ser maior que zero.");
             }
 
+            var isMigratedCourse = product.TipoProduto == "course"
+                && await _context.Courses.AnyAsync(course => course.LegacyProductId == product.Id);
+
+            if (isMigratedCourse && !item.TurmaId.HasValue)
+            {
+                return ServiceResult<Dictionary<int, Product>>.Fail(
+                    $"O curso '{product.Nome}' exige a selecao de uma turma.");
+            }
+
             if (item.TurmaId.HasValue)
             {
                 if (product.TipoProduto != "course")
