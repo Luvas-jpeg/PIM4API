@@ -124,7 +124,8 @@ public class OrderService
             }).ToList()
         };
 
-        order.Total = subtotal + request.ValorFrete - discount;
+        order.ValorFrete = 0;
+        order.Total = subtotal - discount;
 
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
@@ -138,6 +139,7 @@ public class OrderService
             Total = order.Total
         });
     }
+
 
     public async Task<ServiceResult<List<OrderResponse>>> GetMyOrdersAsync(int userId)
     {

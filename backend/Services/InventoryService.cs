@@ -51,6 +51,12 @@ public class InventoryService
                     $"A quantidade maxima por pedido para cursos e {MaxCourseQuantityPerOrder} inscricoes.");
             }
 
+            if (product.TipoProduto != "course")
+            {
+                return ServiceResult<Dictionary<int, Product>>.Fail(
+                    "A loja aceita somente cursos.");
+            }
+
             var isMigratedCourse = product.TipoProduto == "course"
                 && await _context.Courses.AnyAsync(course => course.LegacyProductId == product.Id);
 

@@ -69,7 +69,6 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
 // --- Serviços ---
-builder.Services.AddScoped<ProductService>();
 builder.Services.AddScoped<CourseService>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<AuthService>();

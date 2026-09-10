@@ -511,6 +511,22 @@ Carrinho
 - Recalcular preco, desconto e total no backend;
 - Registrar moeda, parcelas, identificador externo e datas do pagamento.
 
+Primeiro bloco implementado:
+
+- total do pedido continua sendo calculado no backend a partir dos produtos e
+  do desconto validado; o frete informado pelo frontend nao e mais confiado;
+- frete de equipamentos e recalculado com base no endereco do usuario e na
+  quantidade de equipamentos;
+- webhook de pagamento agora valida assinatura HMAC-SHA256 usando o corpo bruto
+  da requisicao e comparacao em tempo constante;
+- payloads invalidos ou assinaturas ausentes/incorretas sao rejeitados antes do
+  processamento do pedido;
+- teste adicionado para garantir que um frete adulterado pelo cliente nao altere
+  o total de um pedido de cursos.
+- O fluxo atual de checkout foi ajustado somente para cursos: frete e endereco de
+  entrega foram removidos da compra nova; produtos legados de equipamento
+  permanecem apenas para historico e sao rejeitados em novos pedidos.
+
 ### Concorrencia
 
 O controle de vagas deve ser transacional. Avaliar e testar:

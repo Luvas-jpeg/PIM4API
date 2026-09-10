@@ -352,6 +352,29 @@ public sealed class CourseDomainTests
     }
 
     [Fact]
+    public async Task NewOrdersRejectNonCourseProducts()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var product = new Product
+        {
+            Nome = "Produto legado",
+            TipoProduto = "equipment",
+            Preco = 100m,
+            Estoque = 5
+        };
+        fixture.Context.Products.Add(product);
+        await fixture.Context.SaveChangesAsync();
+
+        var result = await new InventoryService(fixture.Context).ValidateAndReserveAsync(new List<CreateOrderItemDTO>
+        {
+            new() { ProdutoId = product.Id, Quantidade = 1 }
+        });
+
+        Assert.False(result.Success);
+        Assert.Contains("somente cursos", result.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task CatalogOptionsIncludeOnlyAvailableActiveCourseData()
     {
         await using var fixture = await TestFixture.CreateAsync();

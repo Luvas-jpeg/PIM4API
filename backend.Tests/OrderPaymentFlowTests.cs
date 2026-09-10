@@ -92,6 +92,21 @@ public sealed class OrderPaymentFlowTests
         Assert.Equal(2, (await fixture.Context.Products.SingleAsync(product => product.Id == fixture.CourseId)).Estoque);
     }
 
+    [Fact]
+    public async Task CreatingCourseOrderIgnoresClientProvidedShipping()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var service = fixture.CreateOrderService();
+        var request = CreateRequest();
+        request.ValorFrete = 999m;
+
+        var result = await service.CreateAsync(fixture.UserId, request);
+
+        Assert.True(result.Success);
+        Assert.Equal(0m, (await fixture.Context.Orders.SingleAsync()).ValorFrete);
+        Assert.Equal(100m, result.Data!.Total);
+    }
+
     private static CreateOrderDTO CreateRequest()
     {
         return new CreateOrderDTO

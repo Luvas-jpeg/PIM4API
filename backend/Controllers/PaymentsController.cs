@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using EquipamentosMedicosApi.DTOs;
 using EquipamentosMedicosApi.Services;
@@ -18,14 +20,32 @@ namespace EquipamentosMedicosApi.Controllers
         }
 
         [HttpPost("webhook")]
-        public async Task<IActionResult> Webhook([FromBody] PaymentWebhookDTO payload)
+        public async Task<IActionResult> Webhook()
         {
             var sigHeader = Request.Headers["X-Webhook-Signature"].FirstOrDefault();
             var expected = _config["Payments:WebhookSecret"];
-            if (!string.IsNullOrEmpty(expected) && string.IsNullOrEmpty(sigHeader))
+            using var reader = new StreamReader(Request.Body);
+            var rawBody = await reader.ReadToEndAsync();
+
+            if (!string.IsNullOrEmpty(expected) &&
+                (string.IsNullOrWhiteSpace(sigHeader) ||
+                 !IsValidSignature(rawBody, sigHeader, expected)))
             {
-                return BadRequest(new { message = "Missing signature" });
+                return Unauthorized(new { message = "Invalid webhook signature" });
             }
+
+            PaymentWebhookDTO? payload;
+            try
+            {
+                payload = System.Text.Json.JsonSerializer.Deserialize<PaymentWebhookDTO>(rawBody);
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                return BadRequest(new { message = "Invalid webhook payload." });
+            }
+
+            if (payload == null)
+                return BadRequest(new { message = "Invalid webhook payload." });
 
             if (!payload.OrderId.HasValue)
                 return BadRequest(new { message = "OrderId is required." });
@@ -44,6 +64,20 @@ namespace EquipamentosMedicosApi.Controllers
             }
 
             return Ok(result.Data);
+        }
+
+        private static bool IsValidSignature(string rawBody, string received, string secret)
+        {
+            var provided = received.StartsWith("sha256=", StringComparison.OrdinalIgnoreCase)
+                ? received["sha256=".Length..]
+                : received;
+            var expected = Convert.ToHexString(
+                HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes(rawBody)))
+                .ToLowerInvariant();
+
+            return CryptographicOperations.FixedTimeEquals(
+                Encoding.UTF8.GetBytes(expected),
+                Encoding.UTF8.GetBytes(provided.Trim().ToLowerInvariant()));
         }
     }
 }
