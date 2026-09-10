@@ -275,6 +275,113 @@ public sealed class CourseDomainTests
         Assert.Equal(3, result.Items[0].Classes[0].AvailableSeats);
     }
 
+    [Fact]
+    public async Task CoursePurchaseRejectsCompletedClasses()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var product = new Product
+        {
+            Nome = "Curso concluido",
+            TipoProduto = "course",
+            Preco = 100m
+        };
+        var course = new Course
+        {
+            Nome = product.Nome,
+            Preco = product.Preco,
+            LegacyProduct = product
+        };
+        var courseClass = new CourseClass
+        {
+            Course = course,
+            Produto = product,
+            Status = "completed",
+            DataRealizacao = DateTime.UtcNow.AddDays(2),
+            Capacity = 5,
+            AvailableSeats = 5,
+            VafasDisponiveis = 5
+        };
+        fixture.Context.AddRange(product, course, courseClass);
+        await fixture.Context.SaveChangesAsync();
+
+        var result = await new InventoryService(fixture.Context).ValidateAndReserveAsync(new List<CreateOrderItemDTO>
+        {
+            new() { ProdutoId = product.Id, TurmaId = courseClass.Id, Quantidade = 1 }
+        });
+
+        Assert.False(result.Success);
+        Assert.Contains("inscricoes abertas", result.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CoursePurchaseRejectsMoreThanMaximumQuantity()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var product = new Product
+        {
+            Nome = "Curso com limite",
+            TipoProduto = "course",
+            Preco = 100m
+        };
+        var course = new Course
+        {
+            Nome = product.Nome,
+            Preco = product.Preco,
+            LegacyProduct = product
+        };
+        var courseClass = new CourseClass
+        {
+            Course = course,
+            Produto = product,
+            Status = "scheduled",
+            DataRealizacao = DateTime.UtcNow.AddDays(2),
+            Capacity = 10,
+            AvailableSeats = 10,
+            VafasDisponiveis = 10
+        };
+        fixture.Context.AddRange(product, course, courseClass);
+        await fixture.Context.SaveChangesAsync();
+
+        var result = await new InventoryService(fixture.Context).ValidateAndReserveAsync(new List<CreateOrderItemDTO>
+        {
+            new() { ProdutoId = product.Id, TurmaId = courseClass.Id, Quantidade = 6 }
+        });
+
+        Assert.False(result.Success);
+        Assert.Contains("quantidade maxima", result.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CatalogOptionsIncludeOnlyAvailableActiveCourseData()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var course = new Course
+        {
+            Nome = "Curso com opcoes",
+            Preco = 100m,
+            Category = "Urgencia",
+            IsActive = true
+        };
+        fixture.Context.Courses.Add(course);
+        await fixture.Context.SaveChangesAsync();
+        fixture.Context.CourseClasses.Add(new CourseClass
+        {
+            CourseId = course.Id,
+            DataRealizacao = DateTime.UtcNow.AddDays(5),
+            Status = "scheduled",
+            AvailableSeats = 4,
+            Capacity = 4,
+            VafasDisponiveis = 4,
+            Local = "Campinas"
+        });
+        await fixture.Context.SaveChangesAsync();
+
+        var options = await new CourseService(fixture.Context).GetCatalogOptionsAsync();
+
+        Assert.Contains("Urgencia", options.Categories);
+        Assert.Contains("Campinas", options.Cities);
+    }
+
     private sealed class TestFixture : IAsyncDisposable
     {
         private readonly DbConnection _connection;

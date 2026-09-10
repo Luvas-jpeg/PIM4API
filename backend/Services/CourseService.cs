@@ -66,6 +66,11 @@ public class CourseService
             "price-asc" => query.OrderBy(course => course.Preco),
             "price-desc" => query.OrderByDescending(course => course.Preco),
             "name" => query.OrderBy(course => course.Nome),
+            "relevance" when !string.IsNullOrWhiteSpace(request.Search) =>
+                query.OrderByDescending(course =>
+                    course.Nome.ToLower() == request.Search!.Trim().ToLower() ? 3 :
+                    course.Nome.ToLower().StartsWith(request.Search.Trim().ToLower()) ? 2 : 1)
+                    .ThenBy(course => course.Nome),
             _ => query.OrderBy(course => course.Classes
                 .Where(courseClass => classes.Any(item => item.Id == courseClass.Id))
                 .Min(courseClass => courseClass.DataRealizacao))
@@ -90,6 +95,42 @@ public class CourseService
             PageSize = pageSize,
             TotalItems = totalItems,
             TotalPages = (int)Math.Ceiling(totalItems / (double)pageSize)
+        };
+    }
+
+    public async Task<CourseCatalogOptionsDTO> GetCatalogOptionsAsync()
+    {
+        var today = DateTime.UtcNow;
+        var courses = _context.Courses
+            .Where(course => course.IsActive)
+            .Where(course => course.Classes.Any(courseClass =>
+                courseClass.Status == "scheduled" &&
+                courseClass.DataRealizacao >= today &&
+                courseClass.AvailableSeats > 0));
+
+        var categories = await courses
+            .Where(course => course.Category != "")
+            .Select(course => course.Category)
+            .Distinct()
+            .OrderBy(category => category)
+            .ToListAsync();
+
+        var cities = await courses
+            .SelectMany(course => course.Classes)
+            .Where(courseClass =>
+                courseClass.Status == "scheduled" &&
+                courseClass.DataRealizacao >= today &&
+                courseClass.AvailableSeats > 0 &&
+                courseClass.Local != "")
+            .Select(courseClass => courseClass.Local)
+            .Distinct()
+            .OrderBy(local => local)
+            .ToListAsync();
+
+        return new CourseCatalogOptionsDTO
+        {
+            Categories = categories,
+            Cities = cities
         };
     }
 

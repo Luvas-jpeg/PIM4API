@@ -67,3 +67,9 @@ public class PagedCourseResponseDTO
     public int TotalItems { get; set; }
     public int TotalPages { get; set; }
 }
+
+public class CourseCatalogOptionsDTO
+{
+    public List<string> Categories { get; set; } = new();
+    public List<string> Cities { get; set; } = new();
+}

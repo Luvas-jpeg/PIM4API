@@ -7,6 +7,8 @@ namespace EquipamentosMedicosApi.Services;
 
 public class InventoryService
 {
+    public const int MaxCourseQuantityPerOrder = 5;
+
     private readonly AppDbContext _context;
 
     public InventoryService(AppDbContext context)
@@ -42,6 +44,13 @@ public class InventoryService
                 return ServiceResult<Dictionary<int, Product>>.Fail("Quantidade deve ser maior que zero.");
             }
 
+            if (item.Quantidade > MaxCourseQuantityPerOrder &&
+                product.TipoProduto == "course")
+            {
+                return ServiceResult<Dictionary<int, Product>>.Fail(
+                    $"A quantidade maxima por pedido para cursos e {MaxCourseQuantityPerOrder} inscricoes.");
+            }
+
             var isMigratedCourse = product.TipoProduto == "course"
                 && await _context.Courses.AnyAsync(course => course.LegacyProductId == product.Id);
 
@@ -72,9 +81,16 @@ public class InventoryService
                         $"Turma #{item.TurmaId.Value} nao pertence ao curso informado.");
                 }
 
-                if (courseClass.Status == "cancelled")
+                if (courseClass.Status != "scheduled")
                 {
-                    return ServiceResult<Dictionary<int, Product>>.Fail("A turma selecionada esta cancelada.");
+                    return ServiceResult<Dictionary<int, Product>>.Fail(
+                        "A turma selecionada nao esta com inscricoes abertas.");
+                }
+
+                if (courseClass.DataRealizacao < DateTime.UtcNow)
+                {
+                    return ServiceResult<Dictionary<int, Product>>.Fail(
+                        "Nao e possivel comprar uma turma que ja iniciou.");
                 }
 
                 var reservedSeats = await _context.CourseClasses

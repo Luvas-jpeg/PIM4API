@@ -233,6 +233,8 @@ O backend filtra produtos para aceitar somente `TipoProduto = course`. O catalog
 - Catalogo do frontend passou a consumir o endpoint paginado e exibir filtros, ordenacao, estados de carregamento/erro e navegacao entre paginas.
 - Cards do catalogo agora exibem a proxima turma, data, local e vagas disponiveis; cursos sem turma elegivel mostram aviso de indisponibilidade.
 - Detalhes do curso agora consideram somente turmas agendadas, futuras e com vagas para selecao e compra.
+- Detalhes da turma selecionada agora exibem periodo completo, local, instrutor, capacidade, vagas restantes e status de inscricoes abertas.
+- Checkout de turmas agora rejeita classes concluidas ou fora do periodo de inscricoes, e a tela de detalhes limita a quantidade ao total de vagas restantes com feedback local.
 
 ## Painel administrativo atual
 
@@ -442,6 +444,14 @@ Primeiro bloco implementado:
   para o painel administrativo.
 - cards publicos exibem a proxima turma, local, data e quantidade de vagas;
 - detalhes ocultam turmas passadas, canceladas ou lotadas da selecao de compra.
+- a turma selecionada permanece detalhada antes da adicao ao carrinho, com periodo e status visiveis.
+- a quantidade solicitada nao pode ultrapassar as vagas restantes e classes concluidas ou iniciadas nao podem ser compradas.
+- catalogo permite filtrar por intervalo de datas diretamente na tela inicial, usando os parametros `startDate` e `endDate` da API.
+- filtros de categoria e local agora usam `GET /api/courses/catalog/options`, retornando opcoes de todo o catalogo ativo e disponivel, independentemente da pagina atual.
+- Limite maximo de 5 inscricoes por curso/pedido foi aplicado no backend e refletido na pagina de detalhes, sem permitir quantidade acima do limite ou das vagas restantes.
+- Ordenacao por relevancia foi adicionada para buscas, priorizando correspondencias exatas e iniciais no nome do curso.
+- Carrinho impede misturar duas turmas diferentes do mesmo curso e aplica o limite de 5 inscricoes tambem nas alteracoes de quantidade.
+- Testes frontend adicionados para filtros, carrinho, limite de inscricoes e bloqueio de mistura de turmas.
 
 ### Frontend
 
@@ -462,6 +472,9 @@ Primeiro bloco implementado:
 - A turma escolhida permanece visivel no carrinho e checkout;
 - O catalogo nao apresenta equipamentos;
 - O layout funciona em desktop e mobile.
+
+Status: **Etapa 2 concluida**. O proximo trabalho deve iniciar a Etapa 3,
+com foco em checkout, pagamento e confiabilidade.
 
 ## Etapa 3 - Checkout, pagamento e confiabilidade
 
