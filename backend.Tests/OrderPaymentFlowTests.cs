@@ -40,6 +40,7 @@ public sealed class OrderPaymentFlowTests
         Assert.True(firstWebhook.Success);
         Assert.True(secondWebhook.Success);
         Assert.Equal(1, await fixture.Context.Enrollments.CountAsync());
+        Assert.Equal(1, await fixture.Context.PaymentWebhookEvents.CountAsync());
         Assert.Equal("paid", (await fixture.Context.Orders.SingleAsync()).PaymentStatus);
     }
 
@@ -78,6 +79,34 @@ public sealed class OrderPaymentFlowTests
     }
 
     [Fact]
+    public async Task AdministrativeRefundIsRestrictedToPaidOrdersAndIsIdempotent()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var service = fixture.CreateOrderService();
+        var orderResult = await service.CreateAsync(fixture.UserId, CreateRequest());
+
+        var pendingRefund = await service.RefundAsync(orderResult.Data!.OrderId);
+        Assert.False(pendingRefund.Success);
+
+        await service.ProcessPaymentWebhookAsync(
+            "payment-paid-event",
+            orderResult.Data.OrderId,
+            "gateway-payment-admin",
+            "paid");
+
+        var refund = await service.RefundAsync(orderResult.Data.OrderId);
+        var repeatedRefund = await service.RefundAsync(orderResult.Data.OrderId);
+
+        Assert.True(refund.Success);
+        Assert.True(repeatedRefund.Success);
+        Assert.Equal("refunded", (await fixture.Context.Orders.SingleAsync()).PaymentStatus);
+        Assert.Equal(2, (await fixture.Context.Products
+            .SingleAsync(product => product.Id == fixture.CourseId)).Estoque);
+        Assert.All(await fixture.Context.Enrollments.ToListAsync(), enrollment =>
+            Assert.Equal("cancelled", enrollment.Status));
+    }
+
+    [Fact]
     public async Task RefusedPaymentReleasesReservedStock()
     {
         await using var fixture = await TestFixture.CreateAsync();
@@ -105,6 +134,27 @@ public sealed class OrderPaymentFlowTests
         Assert.True(result.Success);
         Assert.Equal(0m, (await fixture.Context.Orders.SingleAsync()).ValorFrete);
         Assert.Equal(100m, result.Data!.Total);
+    }
+
+    [Fact]
+    public async Task ExpiringPendingOrderReleasesReservationOnlyOnce()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var service = fixture.CreateOrderService();
+        var orderResult = await service.CreateAsync(fixture.UserId, CreateRequest());
+        var order = await fixture.Context.Orders.SingleAsync();
+        order.DataPedido = DateTime.UtcNow.AddMinutes(-31);
+        await fixture.Context.SaveChangesAsync();
+
+        var expired = await service.ExpirePendingOrdersAsync(TimeSpan.FromMinutes(30));
+        var repeated = await service.ExpirePendingOrdersAsync(TimeSpan.FromMinutes(30));
+
+        Assert.Equal(1, expired);
+        Assert.Equal(0, repeated);
+        Assert.Equal("cancelled", order.Status);
+        Assert.Equal("cancelled", order.PaymentStatus);
+        Assert.Equal(2, (await fixture.Context.Products
+            .SingleAsync(product => product.Id == fixture.CourseId)).Estoque);
     }
 
     private static CreateOrderDTO CreateRequest()

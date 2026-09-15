@@ -515,17 +515,48 @@ Primeiro bloco implementado:
 
 - total do pedido continua sendo calculado no backend a partir dos produtos e
   do desconto validado; o frete informado pelo frontend nao e mais confiado;
-- frete de equipamentos e recalculado com base no endereco do usuario e na
-  quantidade de equipamentos;
 - webhook de pagamento agora valida assinatura HMAC-SHA256 usando o corpo bruto
   da requisicao e comparacao em tempo constante;
 - payloads invalidos ou assinaturas ausentes/incorretas sao rejeitados antes do
   processamento do pedido;
+- eventos de webhook agora sao persistidos em `PaymentWebhookEvents`, com
+  `EventId` unico e processamento idempotente;
+- pedidos pendentes com mais de 30 minutos sao expirados automaticamente por um
+  servico em segundo plano, liberando as vagas reservadas uma unica vez;
+- administradores podem reembolsar pedidos pagos por `POST
+  /api/Orders/{id}/refund`; o fluxo e idempotente, cancela matriculas e libera
+  vagas sem repetir a liberacao;
+- a integracao externa com InfinityPay e PicPay permanece separada e pendente
+  do recebimento das credenciais, contratos e URLs oficiais fornecidos pelo
+  cliente; nenhum formato de API de pagamento deve ser presumido;
 - teste adicionado para garantir que um frete adulterado pelo cliente nao altere
   o total de um pedido de cursos.
 - O fluxo atual de checkout foi ajustado somente para cursos: frete e endereco de
   entrega foram removidos da compra nova; produtos legados de equipamento
   permanecem apenas para historico e sao rejeitados em novos pedidos.
+
+Status da Etapa 3: **parcialmente concluida, aguardando definicoes do cliente
+para a integracao externa de pagamentos**.
+
+A parte interna de checkout e confiabilidade esta implementada. A etapa nao
+pode ser considerada totalmente concluida enquanto o cliente nao fornecer e
+confirmar:
+
+- qual provedor sera usado em cada forma de pagamento: InfinityPay, PicPay ou
+  ambos;
+- documentacao e versao oficial das APIs contratadas;
+- credenciais de sandbox e producao, armazenadas fora do codigo;
+- endpoint, formato, autenticacao e assinatura dos webhooks;
+- fluxo de criacao, consulta, cancelamento e reembolso no provedor;
+- identificadores externos, moeda, parcelas e estados oficiais de pagamento;
+- URLs publicas de retorno e webhook;
+- regras de conciliacao e comportamento em caso de timeout ou divergencia.
+
+Essas informacoes sao necessarias para implementar a integracao real sem
+inventar endpoints, headers, payloads ou regras que possam causar pagamentos
+incorretos. Enquanto aguardamos o cliente, o sistema permanece funcional com
+pedidos internos `pending`, processamento simulado por webhook autenticado e
+reembolso interno administrativo.
 
 ### Concorrencia
 
@@ -563,6 +594,34 @@ matriculas.
 - Adicionar historico de pedidos e pagamentos;
 - Separar dados administrativos de dados publicos.
 
+Primeiro bloco implementado:
+
+- `GET /api/me/courses` agora retorna as matriculas do usuario autenticado
+  com curso, turma, pedido, instrutor, local, datas e status;
+- a consulta usa a relacao explicita `CourseClass.Course`, com fallback apenas
+  para dados legados;
+- a area Minha Conta passou a exibir as matriculas do aluno e seus dados de
+  turma, sem expor matriculas de outros usuarios.
+- o historico de pedidos e pagamentos foi adicionado a area do aluno, usando
+  `GET /api/Orders/my`;
+- pedidos ainda pendentes podem ser cancelados pelo proprio aluno, com a mesma
+  liberacao transacional de vagas do backend.
+- foi criada a rota protegida `/conta/pedido/:id`, que consulta
+  `GET /api/Orders/{id}` e exibe detalhes do pedido, itens, pagamento e total;
+- o backend continua filtrando o detalhe pelo usuario autenticado, impedindo o
+  acesso de um aluno ao pedido de outra pessoa.
+- foi criada a rota protegida `/conta/matricula/:id`, com detalhes da turma e
+  instrucoes basicas antes da aula;
+- `GET /api/me/enrollments/{id}` valida que a matricula pertence ao usuario
+  autenticado antes de retornar os dados.
+- a tela de detalhes da matricula exibe avisos contextuais para matriculas
+  ativas, turmas iniciadas, encerradas ou canceladas, sem criar notificacoes
+  ficticias no backend.
+- a area do aluno passou a exibir um resumo com matriculas ativas, concluidas,
+  canceladas e pedidos pendentes;
+- cada matricula agora possui acesso direto aos detalhes da matricula e ao
+  pedido de origem.
+
 ### Frontend
 
 - Criar dashboard do aluno;
@@ -580,6 +639,33 @@ matriculas.
 - O aluno nao acessa dados de outros usuarios;
 - O status exibido corresponde ao backend;
 - O aluno consegue localizar facilmente local e horario da aula.
+
+Status: **Etapa 4 parcialmente concluida**.
+
+Entregas concluidas:
+
+- area autenticada do aluno com matriculas, pedidos e resumo;
+- detalhes protegidos de matricula e pedido;
+- cancelamento de pedidos pendentes;
+- exibicao de turma, data, local, instrutor e instrucoes antes da aula;
+- filtros de acesso por usuario autenticado no backend.
+
+Pendencias para validacao com o cliente:
+
+- **Politica de cancelamento de matricula:** depende da definicao de prazo,
+  elegibilidade, percentual de reembolso, taxa administrativa e regra para
+  turmas ja iniciadas. Sem essas decisoes, o sistema nao deve permitir
+  cancelamento direto de matricula paga.
+- **Certificado:** depende da definicao de presenca minima, conclusao,
+  responsavel pela liberacao, formato e codigo de validacao. Por isso, ainda
+  nao existe emissao ou download de certificado.
+- **Notificacoes persistentes:** depende da escolha dos canais (email, SMS,
+  WhatsApp ou notificacao interna), eventos obrigatorios, templates e
+  provedor. A interface exibe avisos baseados no estado atual, mas ainda nao
+  existe uma central de notificacoes ou envio externo.
+
+As pendencias nao bloqueiam o inicio da Etapa 5, pois os recursos dependem de
+regras comerciais e fornecedores que ainda precisam ser aprovados pelo cliente.
 
 ## Etapa 5 - Painel administrativo profissional
 

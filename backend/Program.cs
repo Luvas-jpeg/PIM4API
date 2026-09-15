@@ -77,6 +77,7 @@ builder.Services.AddScoped<PromoCodeService>();
 builder.Services.AddScoped<EnrollmentService>();
 builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<StudentService>();
+builder.Services.AddHostedService<PendingOrderExpirationService>();
 
 var app = builder.Build();
 

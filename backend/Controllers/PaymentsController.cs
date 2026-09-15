@@ -27,9 +27,14 @@ namespace EquipamentosMedicosApi.Controllers
             using var reader = new StreamReader(Request.Body);
             var rawBody = await reader.ReadToEndAsync();
 
-            if (!string.IsNullOrEmpty(expected) &&
-                (string.IsNullOrWhiteSpace(sigHeader) ||
-                 !IsValidSignature(rawBody, sigHeader, expected)))
+            if (string.IsNullOrWhiteSpace(expected))
+            {
+                return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                    new { message = "Webhook secret is not configured." });
+            }
+
+            if (string.IsNullOrWhiteSpace(sigHeader) ||
+                !IsValidSignature(rawBody, sigHeader, expected))
             {
                 return Unauthorized(new { message = "Invalid webhook signature" });
             }
@@ -47,10 +52,14 @@ namespace EquipamentosMedicosApi.Controllers
             if (payload == null)
                 return BadRequest(new { message = "Invalid webhook payload." });
 
+            if (string.IsNullOrWhiteSpace(payload.EventId))
+                return BadRequest(new { message = "EventId is required." });
+
             if (!payload.OrderId.HasValue)
                 return BadRequest(new { message = "OrderId is required." });
 
             var result = await _orderService.ProcessPaymentWebhookAsync(
+                payload.EventId,
                 payload.OrderId.Value,
                 payload.PaymentId,
                 payload.Status);

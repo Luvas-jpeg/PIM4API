@@ -130,6 +130,23 @@ namespace EquipamentosMedicosApi.Controllers
             return Ok(result.Data);
         }
 
+        [HttpPost("{id}/refund")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Refund(int id)
+        {
+            var result = await _orderService.RefundAsync(id);
+
+            if (!result.Success)
+            {
+                if (result.Error == "Pedido nao encontrado.")
+                    return NotFound(new { message = result.Error });
+
+                return BadRequest(new { message = result.Error });
+            }
+
+            return Ok(result.Data);
+        }
+
         private int? GetAuthenticatedUserId()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)

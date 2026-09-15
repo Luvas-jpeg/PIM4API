@@ -18,6 +18,7 @@ namespace EquipamentosMedicosApi.Data
         public DbSet<PromoCode> PromoCodes { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<CourseProgress> CourseProgresses { get; set; }
+        public DbSet<PaymentWebhookEvent> PaymentWebhookEvents { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -47,6 +48,16 @@ namespace EquipamentosMedicosApi.Data
                 .HasIndex(order => new { order.UsuarioId, order.IdempotencyKey })
                 .IsUnique()
                 .HasFilter("\"IdempotencyKey\" IS NOT NULL");
+
+            modelBuilder.Entity<PaymentWebhookEvent>()
+                .HasIndex(webhookEvent => webhookEvent.EventId)
+                .IsUnique();
+
+            modelBuilder.Entity<PaymentWebhookEvent>()
+                .HasOne(webhookEvent => webhookEvent.Order)
+                .WithMany()
+                .HasForeignKey(webhookEvent => webhookEvent.OrderId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Course>()
                 .HasIndex(course => course.LegacyProductId)

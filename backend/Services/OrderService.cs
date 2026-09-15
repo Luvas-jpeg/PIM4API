@@ -242,9 +242,104 @@ public class OrderService
         return ServiceResult<OrderResponse>.Ok(ToResponse(order));
     }
 
-    public async Task<ServiceResult<OrderResponse>> ProcessPaymentWebhookAsync(int orderId, string paymentId, string paymentStatus)
+    public async Task<int> ExpirePendingOrdersAsync(TimeSpan maxAge)
+    {
+        var cutoff = DateTime.UtcNow.Subtract(maxAge);
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        var orders = await _context.Orders
+            .Include(order => order.Itens)
+            .Where(order =>
+                order.PaymentStatus == "pending" &&
+                order.Status == "pending" &&
+                order.DataPedido < cutoff)
+            .ToListAsync();
+
+        foreach (var order in orders)
+        {
+            await ReleaseStockAsync(order);
+            order.Status = "cancelled";
+            order.PaymentStatus = "cancelled";
+        }
+
+        await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        return orders.Count;
+    }
+
+    public async Task<ServiceResult<OrderResponse>> RefundAsync(int orderId)
     {
         await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        var order = await _context.Orders
+            .Include(item => item.Itens)
+                .ThenInclude(item => item.Produto)
+            .Include(item => item.Itens)
+                .ThenInclude(item => item.Turma)
+            .Include(item => item.Usuario)
+            .FirstOrDefaultAsync(item => item.Id == orderId);
+
+        if (order == null)
+            return ServiceResult<OrderResponse>.Fail("Pedido nao encontrado.");
+
+        if (order.PaymentStatus == "refunded")
+            return ServiceResult<OrderResponse>.Ok(ToResponse(order));
+
+        if (order.PaymentStatus != "paid")
+            return ServiceResult<OrderResponse>.Fail(
+                "Somente pedidos pagos podem ser reembolsados.");
+
+        await ReleaseStockAsync(order);
+
+        var enrollments = await _context.Enrollments
+            .Where(enrollment => enrollment.OrderId == order.Id)
+            .ToListAsync();
+
+        foreach (var enrollment in enrollments)
+            enrollment.Status = "cancelled";
+
+        order.PaymentStatus = "refunded";
+        order.Status = "cancelled";
+
+        await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        return ServiceResult<OrderResponse>.Ok(ToResponse(order));
+    }
+
+    public async Task<ServiceResult<OrderResponse>> ProcessPaymentWebhookAsync(int orderId, string paymentId, string paymentStatus)
+    {
+        return await ProcessPaymentWebhookAsync(
+            $"legacy-{orderId}-{paymentId}-{paymentStatus}",
+            orderId,
+            paymentId,
+            paymentStatus);
+    }
+
+    public async Task<ServiceResult<OrderResponse>> ProcessPaymentWebhookAsync(
+        string eventId,
+        int orderId,
+        string paymentId,
+        string paymentStatus)
+    {
+        eventId = eventId.Trim();
+        if (string.IsNullOrWhiteSpace(eventId))
+            return ServiceResult<OrderResponse>.Fail("EventId e obrigatorio.");
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        var existingEvent = await _context.PaymentWebhookEvents
+            .Include(webhookEvent => webhookEvent.Order)
+                .ThenInclude(order => order!.Usuario)
+            .Include(webhookEvent => webhookEvent.Order)
+                .ThenInclude(order => order!.Itens)
+                    .ThenInclude(item => item.Produto)
+            .FirstOrDefaultAsync(webhookEvent => webhookEvent.EventId == eventId);
+
+        if (existingEvent?.Order != null)
+            return ServiceResult<OrderResponse>.Ok(ToResponse(existingEvent.Order));
 
         var order = await _context.Orders
             .Include(item => item.Itens)
@@ -261,13 +356,22 @@ public class OrderService
         if (normalizedStatus is not ("paid" or "refused" or "cancelled" or "refunded"))
             return ServiceResult<OrderResponse>.Fail("Status de pagamento invalido.");
 
-        if (order.PaymentStatus == "paid" && normalizedStatus != "refunded")
-            return ServiceResult<OrderResponse>.Ok(ToResponse(order));
+        var webhookEvent = new PaymentWebhookEvent
+        {
+            EventId = eventId,
+            OrderId = order.Id,
+            PaymentId = paymentId?.Trim() ?? string.Empty,
+            Status = normalizedStatus,
+            ReceivedAt = DateTime.UtcNow
+        };
+        _context.PaymentWebhookEvents.Add(webhookEvent);
+
+        var alreadyPaidWithoutRefund = order.PaymentStatus == "paid" && normalizedStatus != "refunded";
 
         if (!string.IsNullOrWhiteSpace(paymentId))
             order.GatewayPaymentId = paymentId;
 
-        if (normalizedStatus == "paid")
+        if (normalizedStatus == "paid" && !alreadyPaidWithoutRefund)
         {
             if (order.PaymentStatus != "paid")
             {
@@ -309,6 +413,7 @@ public class OrderService
             order.Status = "cancelled";
         }
 
+        webhookEvent.ProcessedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 

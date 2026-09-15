@@ -46,20 +46,37 @@ namespace EquipamentosMedicosApi.Controllers
 
             var enrollments = await _context.Enrollments
                 .Include(e => e.Class)
+                    .ThenInclude(c => c!.Course)
+                .Include(e => e.Class)
                     .ThenInclude(c => c!.Produto)
                 .Include(e => e.Student)
                 .Where(e => e.Student != null && e.Student.Email == user.Email)
+                .OrderByDescending(e => e.EnrolledAt)
                 .ToListAsync();
 
-            var courses = enrollments.Select(e => new {
-                courseId = e.Class?.ProdutoId,
-                title = e.Class?.Produto?.Nome,
-                description = e.Class?.Produto?.Description,
-                imageUrl = e.Class?.Produto?.Image,
-                instructor = e.Class?.Instructor,
-                location = e.Class?.Local,
-                startDate = e.Class?.DataRealizacao,
-                enrollmentStatus = e.Status
+            var courses = enrollments.Select(e =>
+            {
+                var course = e.Class?.Course;
+                var legacyProduct = e.Class?.Produto;
+
+                return new MyEnrollmentResponse
+                {
+                    EnrollmentId = e.Id,
+                    CourseId = course?.Id ?? legacyProduct?.Id,
+                    ClassId = e.ClassId,
+                    OrderId = e.OrderId,
+                    CourseName = course?.Nome ?? legacyProduct?.Nome ?? string.Empty,
+                    CourseDescription = course?.Description ?? legacyProduct?.Description ?? string.Empty,
+                    CourseImage = course?.Image ?? legacyProduct?.Image ?? string.Empty,
+                    Category = course?.Category ?? legacyProduct?.Category ?? string.Empty,
+                    Instructor = e.Class?.Instructor ?? string.Empty,
+                    Location = e.Class?.Local ?? string.Empty,
+                    StartDate = e.Class?.DataRealizacao ?? DateTime.MinValue,
+                    EndDate = e.Class?.EndDate,
+                    ClassStatus = e.Class?.Status ?? string.Empty,
+                    EnrollmentStatus = e.Status,
+                    EnrolledAt = e.EnrolledAt
+                };
             });
 
             return Ok(courses);
@@ -85,6 +102,52 @@ namespace EquipamentosMedicosApi.Controllers
                 completedLessons = progress.CompletedLessons,
                 lastSeenAt = progress.LastSeenAt,
                 completedAt = progress.CompletedAt
+            });
+        }
+
+        [HttpGet("enrollments/{enrollmentId:int}")]
+        public async Task<IActionResult> GetEnrollment(int enrollmentId)
+        {
+            var userId = GetAuthenticatedUserId();
+            if (userId == null) return Unauthorized();
+
+            var user = await _context.Users.FindAsync(userId.Value);
+            if (user == null) return NotFound();
+
+            var enrollment = await _context.Enrollments
+                .Include(item => item.Class)
+                    .ThenInclude(courseClass => courseClass!.Course)
+                .Include(item => item.Class)
+                    .ThenInclude(courseClass => courseClass!.Produto)
+                .Include(item => item.Student)
+                .FirstOrDefaultAsync(item =>
+                    item.Id == enrollmentId &&
+                    item.Student != null &&
+                    item.Student.Email == user.Email);
+
+            if (enrollment == null)
+                return NotFound(new { message = "Matricula nao encontrada." });
+
+            var course = enrollment.Class?.Course;
+            var legacyProduct = enrollment.Class?.Produto;
+
+            return Ok(new MyEnrollmentResponse
+            {
+                EnrollmentId = enrollment.Id,
+                CourseId = course?.Id ?? legacyProduct?.Id,
+                ClassId = enrollment.ClassId,
+                OrderId = enrollment.OrderId,
+                CourseName = course?.Nome ?? legacyProduct?.Nome ?? string.Empty,
+                CourseDescription = course?.Description ?? legacyProduct?.Description ?? string.Empty,
+                CourseImage = course?.Image ?? legacyProduct?.Image ?? string.Empty,
+                Category = course?.Category ?? legacyProduct?.Category ?? string.Empty,
+                Instructor = enrollment.Class?.Instructor ?? string.Empty,
+                Location = enrollment.Class?.Local ?? string.Empty,
+                StartDate = enrollment.Class?.DataRealizacao ?? DateTime.MinValue,
+                EndDate = enrollment.Class?.EndDate,
+                ClassStatus = enrollment.Class?.Status ?? string.Empty,
+                EnrollmentStatus = enrollment.Status,
+                EnrolledAt = enrollment.EnrolledAt
             });
         }
 
