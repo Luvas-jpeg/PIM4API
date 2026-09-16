@@ -120,7 +120,7 @@ namespace EquipamentosMedicosApi.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateOrderStatusDTO request)
         {
-            var result = await _orderService.UpdateStatusAsync(id, request);
+            var result = await _orderService.UpdateStatusAsync(id, request, GetAuthenticatedUserId());
 
             if (!result.Success)
             {
@@ -134,7 +134,7 @@ namespace EquipamentosMedicosApi.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Refund(int id)
         {
-            var result = await _orderService.RefundAsync(id);
+            var result = await _orderService.RefundAsync(id, GetAuthenticatedUserId());
 
             if (!result.Success)
             {

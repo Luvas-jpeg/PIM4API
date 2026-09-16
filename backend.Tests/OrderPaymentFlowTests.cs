@@ -45,6 +45,36 @@ public sealed class OrderPaymentFlowTests
     }
 
     [Fact]
+    public async Task ApprovedEadPaymentCreatesEnrollmentWithoutClass()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var product = await fixture.Context.Products.SingleAsync(product => product.Id == fixture.CourseId);
+        var course = new Course
+        {
+            Nome = product.Nome,
+            Preco = product.Preco,
+            DeliveryMode = "ead",
+            LegacyProductId = product.Id
+        };
+        fixture.Context.Courses.Add(course);
+        await fixture.Context.SaveChangesAsync();
+
+        var service = fixture.CreateOrderService();
+        var orderResult = await service.CreateAsync(fixture.UserId, CreateRequest());
+        var webhook = await service.ProcessPaymentWebhookAsync(
+            orderResult.Data!.OrderId, "gateway-payment-ead", "paid");
+
+        Assert.True(webhook.Success);
+        var enrollment = await fixture.Context.Enrollments.SingleAsync();
+        Assert.Equal(course.Id, enrollment.CourseId);
+        Assert.Null(enrollment.ClassId);
+        Assert.Equal(2, await fixture.Context.Products
+            .Where(item => item.Id == fixture.CourseId)
+            .Select(item => item.Estoque)
+            .SingleAsync());
+    }
+
+    [Fact]
     public async Task CancellingPendingOrderReleasesReservedStock()
     {
         await using var fixture = await TestFixture.CreateAsync();

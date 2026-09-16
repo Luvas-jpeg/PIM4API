@@ -26,6 +26,9 @@ public class EnrollmentService
             return;
         }
 
+        var course = await _context.Courses.FirstOrDefaultAsync(item =>
+            item.LegacyProductId == product.Id);
+
         var student = await _context.Students.FirstOrDefaultAsync(s =>
             s.Email == user.Email &&
             s.CourseId == product.Id.ToString());
@@ -45,6 +48,30 @@ public class EnrollmentService
 
             _context.Students.Add(student);
             await _context.SaveChangesAsync();
+        }
+
+        if (course?.DeliveryMode == "ead")
+        {
+            var existingEadEnrollments = await _context.Enrollments.CountAsync(enrollment =>
+                enrollment.OrderId == order.Id &&
+                enrollment.StudentId == student.Id &&
+                enrollment.CourseId == course.Id &&
+                enrollment.ClassId == null);
+
+            var eadEnrollmentsToCreate = Math.Max(0, quantity - existingEadEnrollments);
+
+            for (var i = 0; i < eadEnrollmentsToCreate; i++)
+            {
+                _context.Enrollments.Add(new Enrollment
+                {
+                    CourseId = course.Id,
+                    StudentId = student.Id,
+                    OrderId = order.Id,
+                    Status = "active"
+                });
+            }
+
+            return;
         }
 
         var courseClass = classId.HasValue
@@ -95,6 +122,7 @@ public class EnrollmentService
             _context.Enrollments.Add(new Enrollment
             {
                 ClassId = courseClass.Id,
+                CourseId = courseClass.CourseId,
                 StudentId = student.Id,
                 OrderId = order.Id,
                 Status = "active"

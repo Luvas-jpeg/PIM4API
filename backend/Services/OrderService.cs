@@ -19,17 +19,20 @@ public class OrderService
     private readonly InventoryService _inventoryService;
     private readonly PromoCodeService _promoCodeService;
     private readonly EnrollmentService _enrollmentService;
+    private readonly AuditService _auditService;
 
     public OrderService(
         AppDbContext context,
         InventoryService inventoryService,
         PromoCodeService promoCodeService,
-        EnrollmentService enrollmentService)
+        EnrollmentService enrollmentService,
+        AuditService? auditService = null)
     {
         _context = context;
         _inventoryService = inventoryService;
         _promoCodeService = promoCodeService;
         _enrollmentService = enrollmentService;
+        _auditService = auditService ?? new AuditService(context);
     }
 
     public async Task<ServiceResult<CreateOrderResponse>> CreateAsync(
@@ -269,7 +272,7 @@ public class OrderService
         return orders.Count;
     }
 
-    public async Task<ServiceResult<OrderResponse>> RefundAsync(int orderId)
+    public async Task<ServiceResult<OrderResponse>> RefundAsync(int orderId, int? userId = null)
     {
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
@@ -302,6 +305,9 @@ public class OrderService
 
         order.PaymentStatus = "refunded";
         order.Status = "cancelled";
+        _auditService.Add(userId, "refunded", "Order", order.Id,
+            new { PaymentStatus = "paid", Status = "completed" },
+            new { order.PaymentStatus, order.Status });
 
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
@@ -426,6 +432,13 @@ public class OrderService
         var products = await _context.Products
             .Where(product => productIds.Contains(product.Id))
             .ToDictionaryAsync(product => product.Id);
+        var eadProductIds = await _context.Courses
+            .Where(course =>
+                course.LegacyProductId.HasValue &&
+                productIds.Contains(course.LegacyProductId.Value) &&
+                course.DeliveryMode == "ead")
+            .Select(course => course.LegacyProductId!.Value)
+            .ToListAsync();
 
         foreach (var item in order.Itens)
         {
@@ -439,7 +452,8 @@ public class OrderService
                     courseClass.VafasDisponiveis = courseClass.AvailableSeats;
                 }
             }
-            else if (products.TryGetValue(item.ProdutoId, out var product))
+            else if (!eadProductIds.Contains(item.ProdutoId) &&
+                products.TryGetValue(item.ProdutoId, out var product))
                 product.Estoque = (product.Estoque ?? 0) + item.Quantidade;
         }
     }
@@ -484,7 +498,7 @@ public class OrderService
         }).ToList();
     }
 
-    public async Task<ServiceResult<object>> UpdateStatusAsync(int id, UpdateOrderStatusDTO request)
+    public async Task<ServiceResult<object>> UpdateStatusAsync(int id, UpdateOrderStatusDTO request, int? userId = null)
     {
         var status = request.Status.Trim();
 
@@ -500,7 +514,9 @@ public class OrderService
             return ServiceResult<object>.Fail("Pedido nao encontrado.");
         }
 
+        var previousStatus = order.Status;
         order.Status = status;
+        _auditService.Add(userId, "status_changed", "Order", order.Id, previousStatus, status);
 
         await _context.SaveChangesAsync();
 

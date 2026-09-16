@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using EquipamentosMedicosApi.DTOs;
 using EquipamentosMedicosApi.Services;
 
@@ -41,7 +42,7 @@ namespace EquipamentosMedicosApi.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] StudentRequestDTO request)
         {
-            var result = await _studentService.CreateAsync(request);
+            var result = await _studentService.CreateAsync(request, GetUserId());
 
             if (!result.Success)
             {
@@ -54,7 +55,7 @@ namespace EquipamentosMedicosApi.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] StudentRequestDTO request)
         {
-            var result = await _studentService.UpdateAsync(id, request);
+            var result = await _studentService.UpdateAsync(id, request, GetUserId());
 
             if (!result.Success)
             {
@@ -72,11 +73,16 @@ namespace EquipamentosMedicosApi.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var deleted = await _studentService.DeleteAsync(id);
+            var result = await _studentService.DeleteAsync(id, GetUserId());
 
-            if (!deleted)
+            if (!result.Success)
             {
-                return NotFound(new { message = "Aluno nao encontrado." });
+                if (IsNotFound(result.Error))
+                {
+                    return NotFound(new { message = result.Error });
+                }
+
+                return BadRequest(new { message = result.Error });
             }
 
             return NoContent();
@@ -85,6 +91,13 @@ namespace EquipamentosMedicosApi.Controllers
         private static bool IsNotFound(string? error)
         {
             return error?.Contains("nao encontrado", StringComparison.OrdinalIgnoreCase) == true;
+        }
+
+        private int? GetUserId()
+        {
+            var claim = User.FindFirst(ClaimTypes.NameIdentifier)
+                ?? User.FindFirst("sub");
+            return claim != null && int.TryParse(claim.Value, out var userId) ? userId : null;
         }
     }
 }

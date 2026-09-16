@@ -1,6 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using EquipamentosMedicosApi.Data;
 using EquipamentosMedicosApi.DTOs;
 using EquipamentosMedicosApi.Services;
 
@@ -12,11 +15,13 @@ namespace EquipamentosMedicosApi.Controllers
     {
         private readonly OrderService _orderService;
         private readonly IConfiguration _config;
+        private readonly AppDbContext _context;
 
-        public PaymentsController(OrderService orderService, IConfiguration config)
+        public PaymentsController(OrderService orderService, IConfiguration config, AppDbContext context)
         {
             _orderService = orderService;
             _config = config;
+            _context = context;
         }
 
         [HttpPost("webhook")]
@@ -73,6 +78,35 @@ namespace EquipamentosMedicosApi.Controllers
             }
 
             return Ok(result.Data);
+        }
+
+        [HttpGet("webhook-events")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetWebhookEvents([FromQuery] int? orderId = null)
+        {
+            var query = _context.PaymentWebhookEvents.AsNoTracking();
+
+            if (orderId.HasValue)
+            {
+                query = query.Where(webhookEvent => webhookEvent.OrderId == orderId.Value);
+            }
+
+            var events = await query
+                .OrderByDescending(webhookEvent => webhookEvent.ReceivedAt)
+                .Take(100)
+                .Select(webhookEvent => new PaymentWebhookEventResponseDTO
+                {
+                    Id = webhookEvent.Id,
+                    EventId = webhookEvent.EventId,
+                    OrderId = webhookEvent.OrderId,
+                    PaymentId = webhookEvent.PaymentId,
+                    Status = webhookEvent.Status,
+                    ReceivedAt = webhookEvent.ReceivedAt,
+                    ProcessedAt = webhookEvent.ProcessedAt
+                })
+                .ToListAsync();
+
+            return Ok(events);
         }
 
         private static bool IsValidSignature(string rawBody, string received, string secret)

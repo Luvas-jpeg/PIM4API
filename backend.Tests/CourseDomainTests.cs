@@ -11,7 +11,7 @@ namespace backend.Tests;
 public sealed class CourseDomainTests
 {
     [Fact]
-    public async Task CourseClassesCanBeCreatedWithoutLegacyProducts()
+    public async Task CreatedCoursesKeepLegacyProductForCheckoutCompatibility()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var service = new CourseService(fixture.Context);
@@ -39,7 +39,11 @@ public sealed class CourseDomainTests
 
         Assert.True(classResult.Success);
         Assert.Equal(courseId, classResult.Data!.CourseId);
-        Assert.Null(await fixture.Context.CourseClasses
+        Assert.NotNull(await fixture.Context.Courses
+            .Where(course => course.Id == courseId)
+            .Select(course => course.LegacyProductId)
+            .SingleAsync());
+        Assert.Equal(courseResult.Data.LegacyProductId, await fixture.Context.CourseClasses
             .Where(courseClass => courseClass.Id == classResult.Data.Id)
             .Select(courseClass => courseClass.ProdutoId)
             .SingleAsync());
@@ -193,6 +197,79 @@ public sealed class CourseDomainTests
     }
 
     [Fact]
+    public async Task EadCoursePurchaseDoesNotRequireAClass()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var product = new Product
+        {
+            Nome = "Curso EAD",
+            TipoProduto = "course",
+            Preco = 300m,
+            Estoque = 0
+        };
+        var course = new Course
+        {
+            Nome = product.Nome,
+            Preco = product.Preco,
+            DeliveryMode = "ead",
+            LegacyProduct = product
+        };
+        fixture.Context.AddRange(product, course);
+        await fixture.Context.SaveChangesAsync();
+
+        var result = await new InventoryService(fixture.Context).ValidateAndReserveAsync(new List<CreateOrderItemDTO>
+        {
+            new() { ProdutoId = product.Id, Quantidade = 2 }
+        });
+
+        Assert.True(result.Success);
+        Assert.Equal(0, await fixture.Context.Products
+            .Where(item => item.Id == product.Id)
+            .Select(item => item.Estoque)
+            .SingleAsync());
+    }
+
+    [Fact]
+    public async Task EadCoursePurchaseRejectsAProvidedClass()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var product = new Product
+        {
+            Nome = "Curso EAD com turma indevida",
+            TipoProduto = "course",
+            Preco = 300m,
+            Estoque = 0
+        };
+        var course = new Course
+        {
+            Nome = product.Nome,
+            Preco = product.Preco,
+            DeliveryMode = "ead",
+            LegacyProduct = product
+        };
+        var courseClass = new CourseClass
+        {
+            Course = course,
+            Produto = product,
+            Capacity = 5,
+            AvailableSeats = 5,
+            VafasDisponiveis = 5,
+            DataRealizacao = DateTime.UtcNow.AddDays(5),
+            Status = "scheduled"
+        };
+        fixture.Context.AddRange(product, course, courseClass);
+        await fixture.Context.SaveChangesAsync();
+
+        var result = await new InventoryService(fixture.Context).ValidateAndReserveAsync(new List<CreateOrderItemDTO>
+        {
+            new() { ProdutoId = product.Id, TurmaId = courseClass.Id, Quantidade = 1 }
+        });
+
+        Assert.False(result.Success);
+        Assert.Contains("nao deve possuir turma", result.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task CoursePurchaseRejectsAClassFromAnotherCourse()
     {
         await using var fixture = await TestFixture.CreateAsync();
@@ -273,6 +350,171 @@ public sealed class CourseDomainTests
         Assert.Single(result.Items);
         Assert.Equal(availableCourse.Id, result.Items[0].Id);
         Assert.Equal(3, result.Items[0].Classes[0].AvailableSeats);
+    }
+
+    [Fact]
+    public async Task CourseCanBeArchivedAndRestoredWithoutDeletingItsHistory()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var course = new Course
+        {
+            Nome = "Curso arquivavel",
+            Preco = 100m,
+            Category = "Formacao",
+            IsActive = true
+        };
+
+        fixture.Context.Courses.Add(course);
+        await fixture.Context.SaveChangesAsync();
+
+        var service = new CourseService(fixture.Context);
+        var archived = await service.SetActiveAsync(course.Id, false);
+
+        Assert.True(archived.Success);
+        Assert.False(archived.Data!.IsActive);
+        Assert.Equal(course.Id, await fixture.Context.Courses
+            .Where(item => item.Id == course.Id)
+            .Select(item => item.Id)
+            .SingleAsync());
+
+        var restored = await service.SetActiveAsync(course.Id, true);
+
+        Assert.True(restored.Success);
+        Assert.True(restored.Data!.IsActive);
+    }
+
+    [Fact]
+    public async Task EnrollmentStatusChangesUpdateClassAvailability()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var course = new Course { Nome = "Curso", Preco = 100m, IsActive = true };
+        var student = new Student { Name = "Aluno", Email = "aluno@example.com" };
+        var user = new User
+        {
+            ID = 200,
+            Nome = "Usuario",
+            Email = "usuario.enrollment@example.com",
+            Cpf = "52998224725",
+            SenhaHash = "hash"
+        };
+        var order = new Order { UsuarioId = user.ID, Status = "completed", PaymentStatus = "paid" };
+        fixture.Context.AddRange(course, student, user, order);
+        await fixture.Context.SaveChangesAsync();
+
+        var courseClass = new CourseClass
+        {
+            CourseId = course.Id,
+            Capacity = 2,
+            AvailableSeats = 1,
+            VafasDisponiveis = 1,
+            Status = "scheduled",
+            DataRealizacao = DateTime.UtcNow.AddDays(5)
+        };
+        fixture.Context.CourseClasses.Add(courseClass);
+        await fixture.Context.SaveChangesAsync();
+        fixture.Context.Enrollments.Add(new Enrollment
+        {
+            ClassId = courseClass.Id,
+            StudentId = student.Id,
+            OrderId = order.Id,
+            Status = "active"
+        });
+        await fixture.Context.SaveChangesAsync();
+
+        var service = new CourseService(fixture.Context);
+        var completed = await service.UpdateEnrollmentStatusAsync(
+            course.Id, courseClass.Id, student.Id, "completed");
+
+        Assert.True(completed.Success);
+        Assert.Equal("completed", completed.Data!.Status);
+        Assert.Equal(1, await fixture.Context.CourseClasses
+            .Where(item => item.Id == courseClass.Id)
+            .Select(item => item.AvailableSeats)
+            .SingleAsync());
+
+        var cancelled = await service.UpdateEnrollmentStatusAsync(
+            course.Id, courseClass.Id, student.Id, "cancelled");
+
+        Assert.True(cancelled.Success);
+        Assert.Equal(2, await fixture.Context.CourseClasses
+            .Where(item => item.Id == courseClass.Id)
+            .Select(item => item.AvailableSeats)
+            .SingleAsync());
+    }
+
+    [Fact]
+    public async Task ActiveEnrollmentCanBeTransferredBetweenClasses()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var course = new Course { Nome = "Curso com transferencia", Preco = 100m, IsActive = true };
+        var student = new Student { Name = "Aluno", Email = "transferencia@example.com" };
+        var user = new User
+        {
+            ID = 201,
+            Nome = "Usuario",
+            Email = "usuario.transferencia@example.com",
+            Cpf = "52998224725",
+            SenhaHash = "hash"
+        };
+        var order = new Order { UsuarioId = user.ID, Status = "completed", PaymentStatus = "paid" };
+        fixture.Context.AddRange(course, student, user, order);
+        await fixture.Context.SaveChangesAsync();
+
+        var sourceClass = new CourseClass
+        {
+            CourseId = course.Id,
+            Capacity = 3,
+            AvailableSeats = 2,
+            VafasDisponiveis = 2,
+            Status = "scheduled",
+            DataRealizacao = DateTime.UtcNow.AddDays(5),
+            Local = "Sao Paulo",
+            Instructor = "Instrutor A"
+        };
+        var targetClass = new CourseClass
+        {
+            CourseId = course.Id,
+            Capacity = 2,
+            AvailableSeats = 1,
+            VafasDisponiveis = 1,
+            Status = "scheduled",
+            DataRealizacao = DateTime.UtcNow.AddDays(10),
+            Local = "Campinas",
+            Instructor = "Instrutor B"
+        };
+        fixture.Context.CourseClasses.AddRange(sourceClass, targetClass);
+        await fixture.Context.SaveChangesAsync();
+        fixture.Context.Enrollments.Add(new Enrollment
+        {
+            ClassId = sourceClass.Id,
+            StudentId = student.Id,
+            OrderId = order.Id,
+            Status = "active"
+        });
+        await fixture.Context.SaveChangesAsync();
+
+        var result = await new CourseService(fixture.Context).TransferEnrollmentAsync(
+            course.Id,
+            sourceClass.Id,
+            student.Id,
+            targetClass.Id);
+
+        Assert.True(result.Success);
+        Assert.Equal(targetClass.Id, result.Data!.TargetClass.Id);
+        Assert.Equal(3, await fixture.Context.CourseClasses
+            .Where(item => item.Id == sourceClass.Id)
+            .Select(item => item.AvailableSeats)
+            .SingleAsync());
+        Assert.Equal(0, await fixture.Context.CourseClasses
+            .Where(item => item.Id == targetClass.Id)
+            .Select(item => item.AvailableSeats)
+            .SingleAsync());
+        Assert.Equal(targetClass.Id, await fixture.Context.Enrollments
+            .Where(item => item.StudentId == student.Id)
+            .Select(item => item.ClassId)
+            .SingleAsync());
+        Assert.Equal(1, await fixture.Context.AuditLogs
+            .CountAsync(log => log.Action == "transferred" && log.EntityType == "Enrollment"));
     }
 
     [Fact]

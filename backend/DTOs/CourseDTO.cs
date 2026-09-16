@@ -8,9 +8,12 @@ public class CourseResponseDTO
     public decimal Preco { get; set; }
     public string Image { get; set; } = string.Empty;
     public string Category { get; set; } = string.Empty;
+    public string DeliveryMode { get; set; } = "presencial";
+    public int WorkloadHours { get; set; }
     public bool IsActive { get; set; }
     public int? LegacyProductId { get; set; }
     public List<CourseClassResponseDTO> Classes { get; set; } = new();
+    public List<CourseModuleResponseDTO> Modules { get; set; } = new();
 }
 
 public class CourseRequestDTO
@@ -20,6 +23,8 @@ public class CourseRequestDTO
     public decimal Preco { get; set; }
     public string Image { get; set; } = string.Empty;
     public string Category { get; set; } = string.Empty;
+    public string DeliveryMode { get; set; } = "presencial";
+    public int WorkloadHours { get; set; }
     public bool IsActive { get; set; } = true;
 }
 
@@ -44,6 +49,62 @@ public class CourseClassRequestDTO
     public string Instructor { get; set; } = string.Empty;
     public int Capacity { get; set; }
     public string Status { get; set; } = "scheduled";
+}
+
+public class EnrollmentStatusRequestDTO
+{
+    public string Status { get; set; } = "active";
+}
+
+public class CourseModuleResponseDTO
+{
+    public int Id { get; set; }
+    public int CourseId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public int SortOrder { get; set; }
+    public bool IsActive { get; set; }
+    public List<CourseLessonResponseDTO> Lessons { get; set; } = new();
+}
+
+public class CourseModuleRequestDTO
+{
+    public string Title { get; set; } = string.Empty;
+    public int SortOrder { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+
+public class CourseLessonResponseDTO
+{
+    public int Id { get; set; }
+    public int ModuleId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string VideoUrl { get; set; } = string.Empty;
+    public int DurationMinutes { get; set; }
+    public int SortOrder { get; set; }
+    public bool IsActive { get; set; }
+}
+
+public class CourseLessonRequestDTO
+{
+    public string Title { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string VideoUrl { get; set; } = string.Empty;
+    public int DurationMinutes { get; set; }
+    public int SortOrder { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+
+public class TransferEnrollmentRequestDTO
+{
+    public int TargetClassId { get; set; }
+}
+
+public class TransferEnrollmentResponseDTO
+{
+    public StudentDTO Student { get; set; } = new();
+    public CourseClassResponseDTO SourceClass { get; set; } = new();
+    public CourseClassResponseDTO TargetClass { get; set; } = new();
 }
 
 public class CourseCatalogQueryDTO

@@ -10,6 +10,8 @@ namespace EquipamentosMedicosApi.Data
         public DbSet<User> Users { get; set; }
         public DbSet<Product> Products { get; set; }
         public DbSet<Course> Courses { get; set; }
+        public DbSet<CourseModule> CourseModules { get; set; }
+        public DbSet<CourseLesson> CourseLessons { get; set; }
         public DbSet<Order> Orders { get; set; }
         public DbSet<OrderItem> OrderItems { get; set; }
         public DbSet<CourseClass> CourseClasses { get; set; }
@@ -19,6 +21,7 @@ namespace EquipamentosMedicosApi.Data
         public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<CourseProgress> CourseProgresses { get; set; }
         public DbSet<PaymentWebhookEvent> PaymentWebhookEvents { get; set; }
+        public DbSet<AuditLog> AuditLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -59,6 +62,15 @@ namespace EquipamentosMedicosApi.Data
                 .HasForeignKey(webhookEvent => webhookEvent.OrderId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<AuditLog>()
+                .HasIndex(log => new { log.EntityType, log.EntityId, log.CreatedAt });
+
+            modelBuilder.Entity<AuditLog>()
+                .HasOne(log => log.User)
+                .WithMany()
+                .HasForeignKey(log => log.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             modelBuilder.Entity<Course>()
                 .HasIndex(course => course.LegacyProductId)
                 .IsUnique()
@@ -69,6 +81,26 @@ namespace EquipamentosMedicosApi.Data
                 .WithOne(courseClass => courseClass.Course)
                 .HasForeignKey(courseClass => courseClass.CourseId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Course>()
+                .Property(course => course.DeliveryMode)
+                .HasDefaultValue("presencial");
+
+            modelBuilder.Entity<Course>()
+                .Property(course => course.WorkloadHours)
+                .HasDefaultValue(0);
+
+            modelBuilder.Entity<CourseModule>()
+                .HasOne(module => module.Course)
+                .WithMany(course => course.Modules)
+                .HasForeignKey(module => module.CourseId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<CourseModule>()
+                .HasMany(module => module.Lessons)
+                .WithOne(lesson => lesson.Module)
+                .HasForeignKey(lesson => lesson.ModuleId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Course>()
                 .HasOne(course => course.LegacyProduct)
@@ -98,7 +130,13 @@ namespace EquipamentosMedicosApi.Data
                 .HasOne(enrollment => enrollment.Class)
                 .WithMany(courseClass => courseClass.Enrollments)
                 .HasForeignKey(enrollment => enrollment.ClassId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Enrollment>()
+                .HasOne(enrollment => enrollment.Course)
+                .WithMany(course => course.Enrollments)
+                .HasForeignKey(enrollment => enrollment.CourseId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             modelBuilder.Entity<Enrollment>()
                 .HasOne(enrollment => enrollment.Student)

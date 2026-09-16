@@ -57,13 +57,25 @@ public class InventoryService
                     "A loja aceita somente cursos.");
             }
 
-            var isMigratedCourse = product.TipoProduto == "course"
-                && await _context.Courses.AnyAsync(course => course.LegacyProductId == product.Id);
+            var migratedCourse = product.TipoProduto == "course"
+                ? await _context.Courses.FirstOrDefaultAsync(course => course.LegacyProductId == product.Id)
+                : null;
 
-            if (isMigratedCourse && !item.TurmaId.HasValue)
+            if (migratedCourse?.DeliveryMode == "presencial" && !item.TurmaId.HasValue)
             {
                 return ServiceResult<Dictionary<int, Product>>.Fail(
                     $"O curso '{product.Nome}' exige a selecao de uma turma.");
+            }
+
+            if (migratedCourse?.DeliveryMode == "ead")
+            {
+                if (item.TurmaId.HasValue)
+                {
+                    return ServiceResult<Dictionary<int, Product>>.Fail(
+                        $"O curso EAD '{product.Nome}' nao deve possuir turma.");
+                }
+
+                continue;
             }
 
             if (item.TurmaId.HasValue)

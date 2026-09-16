@@ -45,6 +45,7 @@ namespace EquipamentosMedicosApi.Controllers
             if (user == null) return NotFound();
 
             var enrollments = await _context.Enrollments
+                .Include(e => e.Course)
                 .Include(e => e.Class)
                     .ThenInclude(c => c!.Course)
                 .Include(e => e.Class)
@@ -56,7 +57,7 @@ namespace EquipamentosMedicosApi.Controllers
 
             var courses = enrollments.Select(e =>
             {
-                var course = e.Class?.Course;
+                var course = e.Course ?? e.Class?.Course;
                 var legacyProduct = e.Class?.Produto;
 
                 return new MyEnrollmentResponse
@@ -69,6 +70,8 @@ namespace EquipamentosMedicosApi.Controllers
                     CourseDescription = course?.Description ?? legacyProduct?.Description ?? string.Empty,
                     CourseImage = course?.Image ?? legacyProduct?.Image ?? string.Empty,
                     Category = course?.Category ?? legacyProduct?.Category ?? string.Empty,
+                    DeliveryMode = course?.DeliveryMode ?? "presencial",
+                    WorkloadHours = course?.WorkloadHours ?? 0,
                     Instructor = e.Class?.Instructor ?? string.Empty,
                     Location = e.Class?.Local ?? string.Empty,
                     StartDate = e.Class?.DataRealizacao ?? DateTime.MinValue,
@@ -90,6 +93,11 @@ namespace EquipamentosMedicosApi.Controllers
 
             var progress = await _context.CourseProgresses
                 .FirstOrDefaultAsync(p => p.UserId == userId.Value && p.CourseId == courseId);
+
+            if (!await UserHasCourseAccessAsync(userId.Value, courseId))
+            {
+                return NotFound(new { message = "Matricula nao encontrada para este curso." });
+            }
 
             if (progress == null)
             {
@@ -115,6 +123,9 @@ namespace EquipamentosMedicosApi.Controllers
             if (user == null) return NotFound();
 
             var enrollment = await _context.Enrollments
+                .Include(item => item.Course)
+                    .ThenInclude(course => course!.Modules)
+                        .ThenInclude(module => module.Lessons)
                 .Include(item => item.Class)
                     .ThenInclude(courseClass => courseClass!.Course)
                 .Include(item => item.Class)
@@ -128,7 +139,7 @@ namespace EquipamentosMedicosApi.Controllers
             if (enrollment == null)
                 return NotFound(new { message = "Matricula nao encontrada." });
 
-            var course = enrollment.Class?.Course;
+            var course = enrollment.Course ?? enrollment.Class?.Course;
             var legacyProduct = enrollment.Class?.Produto;
 
             return Ok(new MyEnrollmentResponse
@@ -141,13 +152,44 @@ namespace EquipamentosMedicosApi.Controllers
                 CourseDescription = course?.Description ?? legacyProduct?.Description ?? string.Empty,
                 CourseImage = course?.Image ?? legacyProduct?.Image ?? string.Empty,
                 Category = course?.Category ?? legacyProduct?.Category ?? string.Empty,
+                DeliveryMode = course?.DeliveryMode ?? "presencial",
+                WorkloadHours = course?.WorkloadHours ?? 0,
                 Instructor = enrollment.Class?.Instructor ?? string.Empty,
                 Location = enrollment.Class?.Local ?? string.Empty,
                 StartDate = enrollment.Class?.DataRealizacao ?? DateTime.MinValue,
                 EndDate = enrollment.Class?.EndDate,
                 ClassStatus = enrollment.Class?.Status ?? string.Empty,
                 EnrollmentStatus = enrollment.Status,
-                EnrolledAt = enrollment.EnrolledAt
+                EnrolledAt = enrollment.EnrolledAt,
+                Modules = course?.Modules
+                    .Where(module => module.IsActive)
+                    .OrderBy(module => module.SortOrder)
+                    .ThenBy(module => module.Title)
+                    .Select(module => new CourseModuleResponseDTO
+                    {
+                        Id = module.Id,
+                        CourseId = module.CourseId,
+                        Title = module.Title,
+                        SortOrder = module.SortOrder,
+                        IsActive = module.IsActive,
+                        Lessons = module.Lessons
+                            .Where(lesson => lesson.IsActive)
+                            .OrderBy(lesson => lesson.SortOrder)
+                            .ThenBy(lesson => lesson.Title)
+                            .Select(lesson => new CourseLessonResponseDTO
+                            {
+                                Id = lesson.Id,
+                                ModuleId = lesson.ModuleId,
+                                Title = lesson.Title,
+                                Description = lesson.Description,
+                                VideoUrl = lesson.VideoUrl,
+                                DurationMinutes = lesson.DurationMinutes,
+                                SortOrder = lesson.SortOrder,
+                                IsActive = lesson.IsActive
+                            })
+                            .ToList()
+                    })
+                    .ToList() ?? new List<CourseModuleResponseDTO>()
             });
         }
 
@@ -159,6 +201,27 @@ namespace EquipamentosMedicosApi.Controllers
 
             if (request.Percent < 0 || request.Percent > 100)
                 return BadRequest(new { message = "Percent must be between 0 and 100" });
+
+            if (!await UserHasCourseAccessAsync(userId.Value, courseId))
+            {
+                return NotFound(new { message = "Matricula nao encontrada para este curso." });
+            }
+
+            if (request.CompletedLessonId.HasValue)
+            {
+                var lessonBelongsToCourse = await _context.CourseLessons
+                    .AnyAsync(lesson =>
+                        lesson.Id == request.CompletedLessonId.Value &&
+                        lesson.Module != null &&
+                        lesson.Module.CourseId == courseId &&
+                        lesson.IsActive &&
+                        lesson.Module.IsActive);
+
+                if (!lessonBelongsToCourse)
+                {
+                    return BadRequest(new { message = "Aula nao encontrada para este curso." });
+                }
+            }
 
             var progress = await _context.CourseProgresses
                 .FirstOrDefaultAsync(p => p.UserId == userId.Value && p.CourseId == courseId);
@@ -213,6 +276,19 @@ namespace EquipamentosMedicosApi.Controllers
             }
 
             return userId;
+        }
+
+        private async Task<bool> UserHasCourseAccessAsync(int userId, int courseId)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null) return false;
+
+            return await _context.Enrollments.AnyAsync(enrollment =>
+                enrollment.Student != null &&
+                enrollment.Student.Email == user.Email &&
+                enrollment.Status != "cancelled" &&
+                (enrollment.CourseId == courseId ||
+                 (enrollment.Class != null && enrollment.Class.CourseId == courseId)));
         }
     }
 }

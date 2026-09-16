@@ -1,41 +1,105 @@
-# Contexto da primeira etapa - Plataforma de cursos
+# Fluxo de desenvolvimento - Plataforma de cursos
 
 ## Objetivo do projeto
 
-O projeto e uma plataforma de cursos presenciais para web e mobile, com:
+O projeto e uma plataforma de cursos presenciais com tres experiencias
+principais: web, mobile e desktop/admin. A API deve ser compartilhada entre
+todos os clientes.
 
 - Backend ASP.NET Core/.NET 10;
 - Entity Framework Core 10;
 - PostgreSQL 17;
 - Frontend Angular 21;
+- Mobile Flutter, ainda a ser criado;
+- Desktop administrativo, ainda a ser definido;
 - Docker Compose para PostgreSQL, API e frontend.
 
-O sistema deixou de ser um ecommerce de equipamentos medicos. O escopo atual e somente cursos presenciais.
+O sistema deixou de ser um ecommerce de equipamentos medicos. O escopo atual e
+uma plataforma de cursos, separando cursos presenciais e cursos EAD. Nao ha
+previsao de cursos hibridos neste momento.
 
 ## Caminhos dos projetos
 
 ```text
 Backend:  E:\Projetos\PIM4API
 Frontend: E:\Projetos\PIM4Front
+Mobile:   a definir
+Desktop:  a definir
 ```
 
 O antigo caminho `E:\Projetos\e-commerce` nao existe mais. Uma sessao antiga do terminal tentou iniciar nesse diretorio e apresentou `os error 267`. Esse erro significa que o diretorio de trabalho inicial e invalido; nao indica problema no Docker Engine.
+
+## Experiencias esperadas por plataforma
+
+### Web
+
+A experiencia web deve continuar sendo o principal site publico da plataforma.
+Ela deve permitir:
+
+- listar cursos presenciais e EAD;
+- buscar e filtrar cursos;
+- visualizar turmas, data, horario, local, professor/instrutor e vagas;
+- selecionar turma e comprar, quando o curso for presencial;
+- comprar curso EAD sem selecao de turma presencial;
+- acessar area do aluno com pedidos, matriculas e detalhes das turmas;
+- acessar o painel administrativo enquanto o desktop/admin dedicado ainda nao
+  existir.
+
+### Mobile
+
+O aplicativo mobile deve ser focado no estudante. A ideia inicial e permitir:
+
+- consultar cursos comprados ou matriculas ativas;
+- visualizar cursos presenciais com dia, horario, local, professor/instrutor e
+  status da matricula;
+- acompanhar pedidos e status de pagamento;
+- acessar avisos e instrucoes antes da aula presencial;
+- acessar aulas online/conteudos digitais de cursos EAD;
+- futuramente acessar certificado/comprovante, se essa regra for definida.
+
+O mobile nao deve priorizar administracao. Administracao em celular tende a
+ficar limitada e deve ser evitada, exceto para consultas simples.
+
+### Desktop/Admin
+
+O desktop deve ser pensado como uma experiencia administrativa dedicada. A ideia
+inicial e concentrar:
+
+- dashboard de vendas;
+- relatorios administrativos;
+- gerenciamento de cursos;
+- criacao e edicao de turmas;
+- gerenciamento de alunos e matriculas;
+- transferencia de aluno entre turmas;
+- criacao e gestao de cupons;
+- gerenciamento de pedidos, pagamentos, reembolsos e eventos de webhook;
+- auditoria administrativa.
+
+Enquanto o desktop dedicado nao existir, o painel administrativo web continua
+sendo a implementacao principal dessas funcionalidades.
 
 ## Arquitetura de dominio desejada
 
 ```text
 Course
   |
-  +-- CourseClass
-        |
-        +-- OrderItem
-              |
-              +-- Enrollment
-                    +-- Student
-                    +-- Order
+  +-- CourseClass           (somente presencial)
+  |
+  +-- CourseModule          (somente EAD)
+  |     |
+  |     +-- CourseLesson
+  |
+  +-- Enrollment
+        +-- Student
+        +-- Order
 ```
 
-Um curso pode possuir varias turmas. Cada turma possui data, horario, local, instrutor, capacidade e vagas disponiveis. O comprador deve selecionar uma turma antes de concluir o pedido.
+Um curso presencial pode possuir varias turmas. Cada turma possui data,
+horario, local, instrutor, capacidade e vagas disponiveis. O comprador deve
+selecionar uma turma antes de concluir o pedido presencial.
+
+Um curso EAD nao possui turma presencial. Ele deve possuir conteudo digital em
+modulos e aulas, e a matricula fica vinculada diretamente ao curso.
 
 ## O que ja foi implementado no backend
 
@@ -364,7 +428,7 @@ A senha do PostgreSQL e definida quando o volume e criado. Alterar o `.env` nao 
 Ao iniciar uma nova sessao, informar:
 
 ```text
-Leia E:\Projetos\PIM4API\CONTEXTO-PRIMEIRA-ETAPA.md e continue a primeira etapa da separacao entre cursos, turmas e matriculas.
+Leia E:\Projetos\PIM4API\FLUXO-DE-DESENVOLVIMENTO.md e continue o fluxo de desenvolvimento registrado.
 ```
 
 Comecar validando o backend e o banco. Nao recriar o trabalho ja feito e nao apagar volumes do Docker.
@@ -709,6 +773,165 @@ pedidos, pagamentos e relatorios.
 - Consultar identificador do gateway;
 - Exibir falhas de webhook.
 
+Primeiro bloco implementado:
+
+- a aba administrativa de pedidos agora permite buscar por numero, cliente ou
+  curso;
+- foram adicionados filtros por status do pedido e status do pagamento;
+- os status exibidos no painel foram alinhados aos valores reais persistidos
+  pelo backend (`pending`, `processing`, `completed`, `cancelled`);
+- o painel exibe o cliente, o status do pagamento e permite iniciar o
+  reembolso de pedidos pagos.
+- os indicadores de pedidos ativos e o grafico de status passaram a usar os
+  valores internos persistidos, mantendo a traducao apenas na interface;
+- os filtros foram organizados no formulario administrativo sem ultrapassar o
+  limite maximo de CSS do build do frontend.
+
+Validacao deste bloco:
+
+- build do frontend concluido com sucesso;
+- 36 testes do frontend aprovados;
+- permanecem apenas avisos pre-existentes de orcamento CSS em outras telas e
+  o aviso informativo do proprio `admin.scss` no limite de 8,00 kB.
+
+Segundo bloco implementado:
+
+- cursos podem ser arquivados e restaurados pelo painel administrativo;
+- o arquivamento usa `IsActive` e nao remove cursos, turmas ou historico;
+- cursos arquivados deixam de aparecer no catalogo publico;
+- o painel administrativo consulta cursos ativos e arquivados para permitir
+  gerenciamento completo;
+- a API recebeu as operacoes protegidas
+  `POST /api/courses/{id}/archive` e
+  `POST /api/courses/{id}/restore`.
+
+Validacao deste segundo bloco:
+
+- build do frontend concluido com sucesso;
+- 36 testes do frontend aprovados;
+- 20 testes do backend aprovados;
+- nenhuma migration foi necessaria, pois o campo `IsActive` ja existia.
+
+Terceiro bloco implementado:
+
+- o painel de turmas permite consultar os alunos matriculados e alterar o
+  status individual da matricula;
+- a API administrativa recebeu
+  `PATCH /api/courses/{courseId}/classes/{classId}/students/{studentId}/status`;
+- os status aceitos sao `active`, `completed` e `cancelled`;
+- cancelamentos liberam uma vaga e reativacoes reservam uma vaga novamente;
+- alterar uma matricula para concluida preserva a ocupacao historica da turma;
+- a reativacao e bloqueada quando a turma esta cancelada, concluida ou sem
+  vagas.
+
+Validacao deste terceiro bloco:
+
+- 36 testes do frontend aprovados;
+- 21 testes do backend aprovados;
+- a capacidade da turma permanece consistente nas transicoes entre
+  matricula ativa, concluida e cancelada.
+
+Quarto bloco implementado:
+
+- o modal de alunos da turma agora permite exportar a lista de presenca em
+  CSV;
+- o arquivo inclui nome, e-mail, telefone, data da matricula e status;
+- o nome do arquivo identifica o curso, a turma e a data da exportacao;
+- a exportacao ocorre somente quando existem alunos carregados para a turma.
+
+Validacao deste quarto bloco:
+
+- build do frontend concluido com sucesso;
+- 36 testes do frontend aprovados;
+- a exportacao foi mantida somente no frontend, sem alterar o contrato da
+  API ou o banco de dados.
+
+Quinto bloco implementado:
+
+- o dashboard administrativo passou a exibir taxa de ocupacao das turmas;
+- foi adicionada a taxa de cancelamento dos pedidos;
+- foi criado um ranking de ocupacao por turma;
+- foi criado um resumo de receita por categoria de curso;
+- o dashboard permite exportar um relatorio CSV com esses indicadores.
+
+Validacao deste quinto bloco:
+
+- build do frontend concluido com sucesso;
+- 36 testes do frontend aprovados;
+- os relatorios usam os dados ja carregados pelo painel e nao alteram o
+  contrato da API ou o banco de dados.
+
+Sexto bloco implementado:
+
+- o painel administrativo do frontend foi refatorado em componentes dedicados
+  por mini tela: dashboard, cursos, turmas, cupons, pedidos e auditoria;
+- o componente principal `admin` ficou responsavel apenas por carregar dados,
+  controlar abas e receber notificacoes dos componentes filhos;
+- foi criada a transferencia administrativa de aluno entre turmas do mesmo
+  curso, com ajuste de vagas da turma origem e destino;
+- a transferencia aceita somente matriculas ativas e rejeita turma destino
+  concluida, cancelada ou sem vagas;
+- a API recebeu
+  `POST /api/courses/{courseId}/classes/{classId}/students/{studentId}/transfer`;
+- a transferencia registra auditoria com a acao `transferred`;
+- a aba de pedidos passou a abrir um modal de detalhes com cliente, itens,
+  metodo de pagamento, parcelas, total e identificador do gateway;
+- a API recebeu consulta administrativa de eventos de webhook em
+  `GET /api/payments/webhook-events`, com filtro opcional por `orderId`;
+- o detalhe administrativo do pedido exibe os eventos de webhook registrados
+  para aquele pedido.
+
+Validacao deste sexto bloco:
+
+- build do backend concluido com sucesso;
+- 22 testes do backend aprovados;
+- build do frontend concluido com sucesso;
+- 36 testes do frontend aprovados;
+- permanecem apenas avisos pre-existentes de budget CSS em algumas telas.
+
+Setimo bloco implementado:
+
+- o cadastro manual de alunos no backend passou a bloquear duplicidade por
+  e-mail e curso;
+- e-mails de alunos sao normalizados para minusculas e status de matricula sao
+  normalizados antes de persistir;
+- criacao, edicao e remocao manual de aluno agora registram auditoria;
+- remocao manual de aluno com matriculas vinculadas foi bloqueada para
+  preservar historico academico e financeiro;
+- testes de negocio foram adicionados para cadastro duplicado e bloqueio de
+  remocao de aluno com matricula;
+- o painel administrativo recebeu uma aba `Alunos`, com consulta geral,
+  busca por nome, e-mail, telefone ou curso e filtro por status.
+
+Validacao deste setimo bloco:
+
+- build do backend concluido com sucesso;
+- 24 testes do backend aprovados;
+- build do frontend concluido com sucesso;
+- 36 testes do frontend aprovados;
+- permanecem apenas avisos pre-existentes de budget CSS em algumas telas.
+
+Oitavo bloco implementado:
+
+- a auditoria administrativa passou a ter busca textual, filtro por acao,
+  filtro por entidade e exportacao CSV dos registros filtrados;
+- a aba de pedidos passou a exportar CSV dos pedidos filtrados;
+- a aba de alunos passou a abrir um detalhe administrativo simples do aluno,
+  com contato, curso, status e data de matricula;
+- o painel administrativo foi revisado para cobrir as operacoes principais de
+  cursos, turmas, alunos, pedidos, pagamentos, relatorios e auditoria.
+
+Validacao deste oitavo bloco:
+
+- build do backend concluido com sucesso;
+- 24 testes do backend aprovados;
+- build do frontend concluido com sucesso;
+- 36 testes do frontend aprovados;
+- permanecem apenas avisos pre-existentes de budget CSS em algumas telas e o
+  alerta de vulnerabilidade do pacote `Microsoft.OpenApi`.
+
+Status: **Etapa 5 concluida**.
+
 ### Relatorios
 
 - Faturamento por periodo;
@@ -724,6 +947,120 @@ pedidos, pagamentos e relatorios.
 - Operacoes destrutivas sao substituidas por arquivamento;
 - Toda alteracao importante registra usuario e data;
 - O painel funciona com dados reais de `Course`, `CourseClass` e `Enrollment`.
+
+## Etapa 5.5 - Separacao entre cursos EAD e presenciais
+
+### Objetivo
+
+Criar a base tecnica para dois fluxos de curso:
+
+- **Presencial:** precisa de turma, data, local, instrutor, capacidade e vagas.
+- **EAD:** nao possui turma presencial; possui modulos, aulas online e pode ser
+  comprado sem `TurmaId`.
+
+Nao existe curso hibrido nesta etapa.
+
+### Backend implementado
+
+- `Course` recebeu `DeliveryMode` (`presencial` ou `ead`) e `WorkloadHours`;
+- criadas as entidades `CourseModule` e `CourseLesson`;
+- `Enrollment` agora aceita `ClassId` nullable e possui `CourseId` para
+  matriculas EAD;
+- `CourseService` valida modalidade, bloqueia turmas para cursos EAD e gerencia
+  modulos/aulas;
+- criacao/edicao de curso sincroniza um `Product` legado de tipo `course`,
+  mantendo o checkout atual funcional enquanto `OrderItem` ainda usa
+  `ProdutoId`;
+- `CoursesController` recebeu endpoints para modulos e aulas EAD;
+- `InventoryService` exige turma somente para presencial e rejeita turma em EAD;
+- `EnrollmentService` cria matriculas EAD com `CourseId` e `ClassId = null`;
+- `OrderService` nao reserva nem devolve estoque para curso EAD;
+- `MeController` consulta matriculas por `Course` direto, mantendo fallback
+  legado.
+
+Migration criada:
+
+```text
+backend\Migrations\20260916090000_AddEadCoursesContent.cs
+```
+
+### Frontend implementado
+
+- `Course` agora possui `deliveryMode`, `workloadHours`, `modules` e `lessons`;
+- `CourseService` consome endpoints de modulos e aulas;
+- cadastro administrativo de cursos permite escolher `Presencial` ou `EAD`;
+- aba `Turmas` bloqueia criacao de turma para EAD;
+- criada aba administrativa `Conteudo EAD` para cadastrar modulos e aulas;
+- detalhes do curso permitem comprar EAD sem turma;
+- carrinho e checkout exibem EAD como acesso online;
+- checkout exige turma somente para curso presencial;
+- catalogo diferencia cursos `EAD` e `Presencial`.
+
+### Testes e validacao
+
+- Backend build concluido com sucesso;
+- Backend tests: 27 aprovados;
+- Frontend build concluido com sucesso;
+- Frontend tests: 36 aprovados.
+
+Testes adicionados:
+
+- compra de curso EAD sem turma e sem reserva de estoque;
+- rejeicao de compra EAD com turma informada;
+- pagamento aprovado de EAD criando matricula com `CourseId` e `ClassId` nulo.
+
+Avisos conhecidos:
+
+- `Microsoft.OpenApi 2.0.0` possui alerta de vulnerabilidade alto;
+- alguns arquivos SCSS continuam acima do budget de warning, mas abaixo do
+  limite de erro.
+
+### Pendencias futuras
+
+- Criar area do estudante para assistir aulas EAD;
+- modelar progresso por aula/modulo de forma mais completa;
+- definir avaliacao EAD: prova, nota minima, tentativas e banco de questoes;
+- definir emissao de certificado: criterio de conclusao, carga horaria, codigo
+  de validacao e layout;
+- remover gradualmente a dependencia de `Product` para novos cursos, mantendo
+  compatibilidade historica;
+- atualizar o `AppDbContextModelSnapshot` por migration gerada pelo EF quando o
+  ambiente de migrations estiver estabilizado.
+
+Status: **Etapa 5.5 concluida como base funcional**.
+
+### Incremento da area do estudante EAD
+
+Foi adicionada uma primeira experiencia do aluno para cursos EAD:
+
+- `GET /api/me/enrollments/{id}` agora retorna `DeliveryMode`,
+  `WorkloadHours` e os modulos/aulas ativos quando a matricula pertence a um
+  curso EAD;
+- `GET /api/me/courses/{courseId}/progress` e
+  `PUT /api/me/courses/{courseId}/progress` passaram a validar se o usuario
+  autenticado possui matricula ativa no curso antes de consultar ou atualizar
+  progresso;
+- a atualizacao de progresso valida se a aula pertence ao curso matriculado;
+- a area Minha Conta diferencia matriculas EAD e presenciais;
+- a tela de detalhes da matricula EAD funciona como uma sala simples de aulas,
+  exibindo modulos, aulas, link do video e botao para marcar aula como
+  concluida;
+- o percentual de progresso e calculado a partir das aulas concluidas pela
+  interface e persistido no backend.
+
+Validacao deste incremento:
+
+- backend build concluido com sucesso;
+- backend tests: 27 aprovados;
+- frontend build concluido com sucesso;
+- frontend tests: 36 aprovados.
+
+Ainda nao foi implementado:
+
+- avaliacao formal do aluno;
+- regra de nota minima/tentativas;
+- certificado;
+- tela mobile Flutter para assistir aulas.
 
 ## Etapa 6 - Seguranca e controle de acesso
 

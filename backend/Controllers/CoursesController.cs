@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using EquipamentosMedicosApi.DTOs;
 using EquipamentosMedicosApi.Services;
 
@@ -39,7 +40,7 @@ public class CoursesController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create(CourseRequestDTO request)
     {
-        var result = await _courseService.CreateAsync(request);
+        var result = await _courseService.CreateAsync(request, GetUserId());
         return result.Success
             ? CreatedAtAction(nameof(GetById), new { id = result.Data!.Id }, result.Data)
             : BadRequest(new { message = result.Error });
@@ -49,13 +50,23 @@ public class CoursesController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(int id, CourseRequestDTO request)
     {
-        var result = await _courseService.UpdateAsync(id, request);
+        var result = await _courseService.UpdateAsync(id, request, GetUserId());
         if (!result.Success)
             return result.Error?.Contains("nao encontrado", StringComparison.OrdinalIgnoreCase) == true
                 ? NotFound(new { message = result.Error })
                 : BadRequest(new { message = result.Error });
         return Ok(result.Data);
     }
+
+    [HttpPost("{id:int}/archive")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Archive(int id)
+        => await SetActive(id, false);
+
+    [HttpPost("{id:int}/restore")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Restore(int id)
+        => await SetActive(id, true);
 
     [HttpGet("{courseId:int}/classes")]
     public async Task<IActionResult> GetClasses(int courseId, [FromQuery] bool includeInactive = false)
@@ -80,11 +91,51 @@ public class CoursesController : ControllerBase
             : Ok(students);
     }
 
+    [HttpPatch("{courseId:int}/classes/{classId:int}/students/{studentId:int}/status")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> UpdateEnrollmentStatus(
+        int courseId,
+        int classId,
+        int studentId,
+        EnrollmentStatusRequestDTO request)
+    {
+        var result = await _courseService.UpdateEnrollmentStatusAsync(
+            courseId,
+            classId,
+            studentId,
+            request.Status,
+            GetUserId());
+
+        return result.Success
+            ? Ok(result.Data)
+            : BadRequest(new { message = result.Error });
+    }
+
+    [HttpPost("{courseId:int}/classes/{classId:int}/students/{studentId:int}/transfer")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> TransferEnrollment(
+        int courseId,
+        int classId,
+        int studentId,
+        TransferEnrollmentRequestDTO request)
+    {
+        var result = await _courseService.TransferEnrollmentAsync(
+            courseId,
+            classId,
+            studentId,
+            request.TargetClassId,
+            GetUserId());
+
+        return result.Success
+            ? Ok(result.Data)
+            : BadRequest(new { message = result.Error });
+    }
+
     [HttpPost("{courseId:int}/classes")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> CreateClass(int courseId, CourseClassRequestDTO request)
     {
-        var result = await _courseService.CreateClassAsync(courseId, request);
+        var result = await _courseService.CreateClassAsync(courseId, request, GetUserId());
         if (!result.Success)
             return result.Error?.Contains("nao encontrado", StringComparison.OrdinalIgnoreCase) == true
                 ? NotFound(new { message = result.Error })
@@ -96,11 +147,91 @@ public class CoursesController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateClass(int courseId, int classId, CourseClassRequestDTO request)
     {
-        var result = await _courseService.UpdateClassAsync(courseId, classId, request);
+        var result = await _courseService.UpdateClassAsync(courseId, classId, request, GetUserId());
         if (!result.Success)
             return result.Error?.Contains("nao encontrada", StringComparison.OrdinalIgnoreCase) == true
                 ? NotFound(new { message = result.Error })
                 : BadRequest(new { message = result.Error });
         return Ok(result.Data);
+    }
+
+    [HttpGet("{courseId:int}/modules")]
+    public async Task<IActionResult> GetModules(int courseId)
+    {
+        var modules = await _courseService.GetModulesAsync(courseId);
+        return modules == null
+            ? NotFound(new { message = "Curso nao encontrado." })
+            : Ok(modules);
+    }
+
+    [HttpPost("{courseId:int}/modules")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> CreateModule(int courseId, CourseModuleRequestDTO request)
+    {
+        var result = await _courseService.CreateModuleAsync(courseId, request, GetUserId());
+        return result.Success
+            ? Ok(result.Data)
+            : BadRequest(new { message = result.Error });
+    }
+
+    [HttpPut("{courseId:int}/modules/{moduleId:int}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> UpdateModule(
+        int courseId,
+        int moduleId,
+        CourseModuleRequestDTO request)
+    {
+        var result = await _courseService.UpdateModuleAsync(courseId, moduleId, request, GetUserId());
+        return result.Success
+            ? Ok(result.Data)
+            : BadRequest(new { message = result.Error });
+    }
+
+    [HttpPost("{courseId:int}/modules/{moduleId:int}/lessons")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> CreateLesson(
+        int courseId,
+        int moduleId,
+        CourseLessonRequestDTO request)
+    {
+        var result = await _courseService.CreateLessonAsync(courseId, moduleId, request, GetUserId());
+        return result.Success
+            ? Ok(result.Data)
+            : BadRequest(new { message = result.Error });
+    }
+
+    [HttpPut("{courseId:int}/modules/{moduleId:int}/lessons/{lessonId:int}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> UpdateLesson(
+        int courseId,
+        int moduleId,
+        int lessonId,
+        CourseLessonRequestDTO request)
+    {
+        var result = await _courseService.UpdateLessonAsync(
+            courseId,
+            moduleId,
+            lessonId,
+            request,
+            GetUserId());
+        return result.Success
+            ? Ok(result.Data)
+            : BadRequest(new { message = result.Error });
+    }
+
+    private async Task<IActionResult> SetActive(int id, bool isActive)
+    {
+        var result = await _courseService.SetActiveAsync(id, isActive, GetUserId());
+        if (!result.Success)
+            return NotFound(new { message = result.Error });
+
+        return Ok(result.Data);
+    }
+
+    private int? GetUserId()
+    {
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier)
+            ?? User.FindFirst("sub");
+        return claim != null && int.TryParse(claim.Value, out var userId) ? userId : null;
     }
 }
