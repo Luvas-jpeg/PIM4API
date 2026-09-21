@@ -19,5 +19,6 @@ public class Course
     public Product? LegacyProduct { get; set; }
     public ICollection<CourseClass> Classes { get; set; } = new List<CourseClass>();
     public ICollection<CourseModule> Modules { get; set; } = new List<CourseModule>();
+    public ICollection<CourseAssessment> Assessments { get; set; } = new List<CourseAssessment>();
     public ICollection<Enrollment> Enrollments { get; set; } = new List<Enrollment>();
 }

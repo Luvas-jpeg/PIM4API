@@ -14,6 +14,7 @@ public class CourseResponseDTO
     public int? LegacyProductId { get; set; }
     public List<CourseClassResponseDTO> Classes { get; set; } = new();
     public List<CourseModuleResponseDTO> Modules { get; set; } = new();
+    public List<CourseAssessmentResponseDTO> Assessments { get; set; } = new();
 }
 
 public class CourseRequestDTO
@@ -93,6 +94,59 @@ public class CourseLessonRequestDTO
     public int DurationMinutes { get; set; }
     public int SortOrder { get; set; }
     public bool IsActive { get; set; } = true;
+}
+
+public class CourseAssessmentResponseDTO
+{
+    public int Id { get; set; }
+    public int CourseId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public int MinimumScore { get; set; }
+    public int MaxAttempts { get; set; }
+    public bool IsActive { get; set; }
+    public List<CourseQuestionResponseDTO> Questions { get; set; } = new();
+}
+
+public class CourseAssessmentRequestDTO
+{
+    public string Title { get; set; } = string.Empty;
+    public int MinimumScore { get; set; } = 70;
+    public int MaxAttempts { get; set; } = 3;
+    public bool IsActive { get; set; } = true;
+}
+
+public class CourseQuestionResponseDTO
+{
+    public int Id { get; set; }
+    public int AssessmentId { get; set; }
+    public string Statement { get; set; } = string.Empty;
+    public int SortOrder { get; set; }
+    public bool IsActive { get; set; }
+    public List<CourseQuestionOptionResponseDTO> Options { get; set; } = new();
+}
+
+public class CourseQuestionRequestDTO
+{
+    public string Statement { get; set; } = string.Empty;
+    public int SortOrder { get; set; }
+    public bool IsActive { get; set; } = true;
+    public List<CourseQuestionOptionRequestDTO> Options { get; set; } = new();
+}
+
+public class CourseQuestionOptionResponseDTO
+{
+    public int Id { get; set; }
+    public int QuestionId { get; set; }
+    public string Text { get; set; } = string.Empty;
+    public bool IsCorrect { get; set; }
+    public int SortOrder { get; set; }
+}
+
+public class CourseQuestionOptionRequestDTO
+{
+    public string Text { get; set; } = string.Empty;
+    public bool IsCorrect { get; set; }
+    public int SortOrder { get; set; }
 }
 
 public class TransferEnrollmentRequestDTO

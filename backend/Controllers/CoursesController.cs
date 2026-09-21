@@ -219,6 +219,52 @@ public class CoursesController : ControllerBase
             : BadRequest(new { message = result.Error });
     }
 
+    [HttpGet("{courseId:int}/assessments")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetAssessments(int courseId)
+    {
+        var assessments = await _courseService.GetAssessmentsAsync(courseId);
+        return assessments == null
+            ? NotFound(new { message = "Curso nao encontrado." })
+            : Ok(assessments);
+    }
+
+    [HttpPost("{courseId:int}/assessments")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> CreateAssessment(int courseId, CourseAssessmentRequestDTO request)
+    {
+        var result = await _courseService.CreateAssessmentAsync(courseId, request, GetUserId());
+        return result.Success
+            ? Ok(result.Data)
+            : BadRequest(new { message = result.Error });
+    }
+
+    [HttpPut("{courseId:int}/assessments/{assessmentId:int}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> UpdateAssessment(
+        int courseId,
+        int assessmentId,
+        CourseAssessmentRequestDTO request)
+    {
+        var result = await _courseService.UpdateAssessmentAsync(courseId, assessmentId, request, GetUserId());
+        return result.Success
+            ? Ok(result.Data)
+            : BadRequest(new { message = result.Error });
+    }
+
+    [HttpPost("{courseId:int}/assessments/{assessmentId:int}/questions")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> CreateQuestion(
+        int courseId,
+        int assessmentId,
+        CourseQuestionRequestDTO request)
+    {
+        var result = await _courseService.CreateQuestionAsync(courseId, assessmentId, request, GetUserId());
+        return result.Success
+            ? Ok(result.Data)
+            : BadRequest(new { message = result.Error });
+    }
+
     private async Task<IActionResult> SetActive(int id, bool isActive)
     {
         var result = await _courseService.SetActiveAsync(id, isActive, GetUserId());

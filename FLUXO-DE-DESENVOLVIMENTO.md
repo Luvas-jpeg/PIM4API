@@ -1019,9 +1019,8 @@ Avisos conhecidos:
 
 - Criar area do estudante para assistir aulas EAD;
 - modelar progresso por aula/modulo de forma mais completa;
-- definir avaliacao EAD: prova, nota minima, tentativas e banco de questoes;
-- definir emissao de certificado: criterio de conclusao, carga horaria, codigo
-  de validacao e layout;
+- evoluir avaliacao EAD com banco de questoes mais completo;
+- evoluir certificado EAD com PDF, layout visual e validacao publica do codigo;
 - remover gradualmente a dependencia de `Product` para novos cursos, mantendo
   compatibilidade historica;
 - atualizar o `AppDbContextModelSnapshot` por migration gerada pelo EF quando o
@@ -1057,10 +1056,128 @@ Validacao deste incremento:
 
 Ainda nao foi implementado:
 
-- avaliacao formal do aluno;
-- regra de nota minima/tentativas;
-- certificado;
 - tela mobile Flutter para assistir aulas.
+
+### Incremento de avaliacao administrativa EAD
+
+Foi adicionada a base administrativa para montar provas de cursos EAD:
+
+- novas entidades `CourseAssessment`, `CourseQuestion` e
+  `CourseQuestionOption`;
+- nova migration manual
+  `backend\Migrations\20260916103000_AddEadAssessments.cs`;
+- `Course` agora retorna avaliacoes vinculadas no contrato administrativo;
+- `CourseService` permite criar/editar avaliacao e cadastrar questoes com
+  alternativas;
+- a validacao exige:
+  - titulo da avaliacao;
+  - nota minima entre 0 e 100;
+  - ao menos uma tentativa;
+  - questao com enunciado;
+  - ao menos duas alternativas;
+  - exatamente uma alternativa correta;
+- `CoursesController` recebeu endpoints administrativos:
+
+```http
+GET    /api/courses/{courseId}/assessments
+POST   /api/courses/{courseId}/assessments
+PUT    /api/courses/{courseId}/assessments/{assessmentId}
+POST   /api/courses/{courseId}/assessments/{assessmentId}/questions
+```
+
+- a aba `Conteudo EAD` do admin agora permite:
+  - configurar titulo da avaliacao;
+  - definir nota minima;
+  - definir numero maximo de tentativas;
+  - cadastrar questoes;
+  - cadastrar alternativas e marcar a correta.
+
+Validacao deste incremento:
+
+- backend build concluido com sucesso;
+- backend tests: 27 aprovados;
+- frontend build concluido com sucesso;
+- frontend tests: 36 aprovados.
+
+### Incremento de submissao da avaliacao pelo aluno
+
+Foi implementada a primeira versao funcional da prova EAD na area do aluno:
+
+- novas entidades `CourseAssessmentAttempt` e `CourseAssessmentAnswer`;
+- nova migration manual
+  `backend\Migrations\20260916110000_AddEadAssessmentAttempts.cs`;
+- `GET /api/me/enrollments/{id}` retorna avaliacoes ativas do curso EAD sem
+  expor o gabarito;
+- novo endpoint autenticado:
+
+```http
+POST /api/me/courses/{courseId}/assessments/{assessmentId}/submit
+```
+
+- a submissao valida:
+  - usuario matriculado no curso;
+  - avaliacao ativa e pertencente ao curso;
+  - limite de tentativas;
+  - todas as questoes respondidas;
+  - alternativas pertencentes as respectivas questoes;
+- o backend calcula a nota percentual, define aprovado/reprovado e registra a
+  tentativa com as respostas;
+- a tela de detalhe da matricula EAD exibe a avaliacao, permite escolher
+  alternativas e mostra nota, aprovacao e tentativas restantes apos o envio.
+
+Validacao deste incremento:
+
+- backend build concluido com sucesso;
+- backend tests: 27 aprovados;
+- frontend build concluido com sucesso;
+- frontend tests: 36 aprovados.
+
+Ainda nao foi implementado:
+
+- tela mobile Flutter para assistir aulas e responder avaliacao.
+
+### Incremento de certificado EAD
+
+Foi implementada a primeira versao de emissao de certificado para cursos EAD:
+
+- nova entidade `CourseCertificate`;
+- nova migration manual
+  `backend\Migrations\20260916113000_AddCourseCertificates.cs`;
+- `GET /api/me/enrollments/{id}` retorna o certificado ja emitido, quando
+  existir;
+- novos endpoints autenticados:
+
+```http
+GET  /api/me/courses/{courseId}/certificate
+POST /api/me/courses/{courseId}/certificate/issue
+```
+
+- a liberacao do certificado exige:
+  - usuario matriculado no curso;
+  - curso na modalidade EAD;
+  - progresso de 100%;
+  - aprovacao em todas as avaliacoes ativas do curso;
+- a emissao e idempotente por aluno e curso, evitando certificado duplicado;
+- o certificado registra aluno, curso, carga horaria, data de emissao e codigo
+  de validacao;
+- a tela de detalhe da matricula EAD mostra o status de liberacao, permite
+  emitir o certificado quando os requisitos forem cumpridos e exibe os dados do
+  certificado emitido.
+
+Validacao deste incremento:
+
+- backend tests: 27 aprovados;
+- frontend build concluido com sucesso;
+- frontend tests: 36 aprovados;
+- permanecem apenas os avisos conhecidos de budget SCSS e a vulnerabilidade do
+  pacote `Microsoft.OpenApi`.
+
+Ainda nao foi implementado:
+
+- download/geracao visual de PDF do certificado;
+- endpoint publico para validar o codigo do certificado;
+- tela mobile Flutter para assistir aulas, responder avaliacao e consultar
+  certificado.
 
 ## Etapa 6 - Seguranca e controle de acesso
 

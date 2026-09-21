@@ -22,6 +22,9 @@ public class CourseService
             .Include(course => course.Classes)
             .Include(course => course.Modules)
                 .ThenInclude(module => module.Lessons)
+            .Include(course => course.Assessments)
+                .ThenInclude(assessment => assessment.Questions)
+                    .ThenInclude(question => question.Options)
             .AsNoTracking();
 
         if (!includeInactive)
@@ -66,6 +69,9 @@ public class CourseService
             .Include(course => course.Classes)
             .Include(course => course.Modules)
                 .ThenInclude(module => module.Lessons)
+            .Include(course => course.Assessments)
+                .ThenInclude(assessment => assessment.Questions)
+                    .ThenInclude(question => question.Options)
             .AsNoTracking();
 
         var sort = request.Sort.Trim().ToLowerInvariant();
@@ -152,6 +158,9 @@ public class CourseService
             .Include(item => item.Classes)
             .Include(item => item.Modules)
                 .ThenInclude(module => module.Lessons)
+            .Include(item => item.Assessments)
+                .ThenInclude(assessment => assessment.Questions)
+                    .ThenInclude(question => question.Options)
             .AsNoTracking()
             .FirstOrDefaultAsync(item => item.Id == id && (includeInactive || item.IsActive));
 
@@ -188,6 +197,9 @@ public class CourseService
             .Include(item => item.Classes)
             .Include(item => item.Modules)
                 .ThenInclude(module => module.Lessons)
+            .Include(item => item.Assessments)
+                .ThenInclude(assessment => assessment.Questions)
+                    .ThenInclude(question => question.Options)
             .FirstOrDefaultAsync(item => item.Id == id);
 
         if (course == null)
@@ -609,6 +621,119 @@ public class CourseService
         return ServiceResult<CourseLessonResponseDTO>.Ok(ToLessonResponse(lesson));
     }
 
+    public async Task<List<CourseAssessmentResponseDTO>?> GetAssessmentsAsync(int courseId)
+    {
+        var exists = await _context.Courses.AnyAsync(course => course.Id == courseId);
+        if (!exists) return null;
+
+        var assessments = await _context.CourseAssessments
+            .Where(assessment => assessment.CourseId == courseId)
+            .Include(assessment => assessment.Questions)
+                .ThenInclude(question => question.Options)
+            .OrderBy(assessment => assessment.Title)
+            .AsNoTracking()
+            .ToListAsync();
+
+        return assessments.Select(ToAssessmentResponse).ToList();
+    }
+
+    public async Task<ServiceResult<CourseAssessmentResponseDTO>> CreateAssessmentAsync(
+        int courseId,
+        CourseAssessmentRequestDTO request,
+        int? userId = null)
+    {
+        var validation = Validate(request);
+        if (validation != null)
+        {
+            return ServiceResult<CourseAssessmentResponseDTO>.Fail(validation);
+        }
+
+        var course = await _context.Courses.FirstOrDefaultAsync(item => item.Id == courseId);
+        if (course == null)
+        {
+            return ServiceResult<CourseAssessmentResponseDTO>.Fail("Curso nao encontrado.");
+        }
+
+        if (course.DeliveryMode != "ead")
+        {
+            return ServiceResult<CourseAssessmentResponseDTO>.Fail("Somente cursos EAD podem possuir avaliacao online.");
+        }
+
+        var assessment = new CourseAssessment();
+        Apply(assessment, request);
+        assessment.CourseId = courseId;
+
+        _context.CourseAssessments.Add(assessment);
+        _auditService.Add(userId, "created", "CourseAssessment", assessment.Id, null,
+            new { assessment.CourseId, assessment.Title, assessment.MinimumScore });
+        await _context.SaveChangesAsync();
+
+        return ServiceResult<CourseAssessmentResponseDTO>.Ok(ToAssessmentResponse(assessment));
+    }
+
+    public async Task<ServiceResult<CourseAssessmentResponseDTO>> UpdateAssessmentAsync(
+        int courseId,
+        int assessmentId,
+        CourseAssessmentRequestDTO request,
+        int? userId = null)
+    {
+        var validation = Validate(request);
+        if (validation != null)
+        {
+            return ServiceResult<CourseAssessmentResponseDTO>.Fail(validation);
+        }
+
+        var assessment = await _context.CourseAssessments
+            .Include(item => item.Questions)
+                .ThenInclude(question => question.Options)
+            .FirstOrDefaultAsync(item => item.Id == assessmentId && item.CourseId == courseId);
+
+        if (assessment == null)
+        {
+            return ServiceResult<CourseAssessmentResponseDTO>.Fail("Avaliacao nao encontrada.");
+        }
+
+        var previous = new { assessment.Title, assessment.MinimumScore, assessment.MaxAttempts, assessment.IsActive };
+        Apply(assessment, request);
+        _auditService.Add(userId, "updated", "CourseAssessment", assessment.Id, previous,
+            new { assessment.Title, assessment.MinimumScore, assessment.MaxAttempts, assessment.IsActive });
+        await _context.SaveChangesAsync();
+
+        return ServiceResult<CourseAssessmentResponseDTO>.Ok(ToAssessmentResponse(assessment));
+    }
+
+    public async Task<ServiceResult<CourseQuestionResponseDTO>> CreateQuestionAsync(
+        int courseId,
+        int assessmentId,
+        CourseQuestionRequestDTO request,
+        int? userId = null)
+    {
+        var validation = Validate(request);
+        if (validation != null)
+        {
+            return ServiceResult<CourseQuestionResponseDTO>.Fail(validation);
+        }
+
+        var assessmentExists = await _context.CourseAssessments
+            .AnyAsync(item => item.Id == assessmentId && item.CourseId == courseId);
+
+        if (!assessmentExists)
+        {
+            return ServiceResult<CourseQuestionResponseDTO>.Fail("Avaliacao nao encontrada.");
+        }
+
+        var question = new CourseQuestion();
+        Apply(question, request);
+        question.AssessmentId = assessmentId;
+
+        _context.CourseQuestions.Add(question);
+        _auditService.Add(userId, "created", "CourseQuestion", question.Id, null,
+            new { question.AssessmentId, question.Statement, Options = question.Options.Count });
+        await _context.SaveChangesAsync();
+
+        return ServiceResult<CourseQuestionResponseDTO>.Ok(ToQuestionResponse(question));
+    }
+
     public async Task<ServiceResult<CourseClassResponseDTO>> CreateClassAsync(int courseId, CourseClassRequestDTO request, int? userId = null)
     {
         var validation = Validate(request);
@@ -756,6 +881,32 @@ public class CourseService
         return null;
     }
 
+    private static string? Validate(CourseAssessmentRequestDTO request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Title))
+            return "Titulo da avaliacao e obrigatorio.";
+        if (request.MinimumScore < 0 || request.MinimumScore > 100)
+            return "Nota minima deve ficar entre 0 e 100.";
+        if (request.MaxAttempts <= 0)
+            return "Tentativas deve ser maior que zero.";
+        return null;
+    }
+
+    private static string? Validate(CourseQuestionRequestDTO request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Statement))
+            return "Enunciado da questao e obrigatorio.";
+        if (request.SortOrder < 0)
+            return "Ordem da questao nao pode ser negativa.";
+        if (request.Options.Count < 2)
+            return "A questao deve possuir ao menos duas alternativas.";
+        if (request.Options.Count(option => option.IsCorrect) != 1)
+            return "A questao deve possuir exatamente uma alternativa correta.";
+        if (request.Options.Any(option => string.IsNullOrWhiteSpace(option.Text)))
+            return "Todas as alternativas devem possuir texto.";
+        return null;
+    }
+
     private static void Apply(Course course, CourseRequestDTO request)
     {
         course.Nome = request.Nome.Trim();
@@ -776,6 +927,30 @@ public class CourseService
         lesson.DurationMinutes = request.DurationMinutes;
         lesson.SortOrder = request.SortOrder;
         lesson.IsActive = request.IsActive;
+    }
+
+    private static void Apply(CourseAssessment assessment, CourseAssessmentRequestDTO request)
+    {
+        assessment.Title = request.Title.Trim();
+        assessment.MinimumScore = request.MinimumScore;
+        assessment.MaxAttempts = request.MaxAttempts;
+        assessment.IsActive = request.IsActive;
+    }
+
+    private static void Apply(CourseQuestion question, CourseQuestionRequestDTO request)
+    {
+        question.Statement = request.Statement.Trim();
+        question.SortOrder = request.SortOrder;
+        question.IsActive = request.IsActive;
+        question.Options = request.Options
+            .OrderBy(option => option.SortOrder)
+            .Select(option => new CourseQuestionOption
+            {
+                Text = option.Text.Trim(),
+                IsCorrect = option.IsCorrect,
+                SortOrder = option.SortOrder
+            })
+            .ToList();
     }
 
     private static void SyncLegacyProduct(Course course)
@@ -819,6 +994,11 @@ public class CourseService
                 .OrderBy(item => item.SortOrder)
                 .ThenBy(item => item.Title)
                 .Select(ToModuleResponse)
+                .ToList(),
+            Assessments = course.Assessments
+                .Where(item => item.IsActive)
+                .OrderBy(item => item.Title)
+                .Select(ToAssessmentResponse)
                 .ToList()
         };
     }
@@ -884,6 +1064,49 @@ public class CourseService
             DurationMinutes = lesson.DurationMinutes,
             SortOrder = lesson.SortOrder,
             IsActive = lesson.IsActive
+        };
+    }
+
+    private static CourseAssessmentResponseDTO ToAssessmentResponse(CourseAssessment assessment)
+    {
+        return new CourseAssessmentResponseDTO
+        {
+            Id = assessment.Id,
+            CourseId = assessment.CourseId,
+            Title = assessment.Title,
+            MinimumScore = assessment.MinimumScore,
+            MaxAttempts = assessment.MaxAttempts,
+            IsActive = assessment.IsActive,
+            Questions = assessment.Questions
+                .Where(item => item.IsActive)
+                .OrderBy(item => item.SortOrder)
+                .ThenBy(item => item.Id)
+                .Select(ToQuestionResponse)
+                .ToList()
+        };
+    }
+
+    private static CourseQuestionResponseDTO ToQuestionResponse(CourseQuestion question)
+    {
+        return new CourseQuestionResponseDTO
+        {
+            Id = question.Id,
+            AssessmentId = question.AssessmentId,
+            Statement = question.Statement,
+            SortOrder = question.SortOrder,
+            IsActive = question.IsActive,
+            Options = question.Options
+                .OrderBy(item => item.SortOrder)
+                .ThenBy(item => item.Id)
+                .Select(option => new CourseQuestionOptionResponseDTO
+                {
+                    Id = option.Id,
+                    QuestionId = option.QuestionId,
+                    Text = option.Text,
+                    IsCorrect = option.IsCorrect,
+                    SortOrder = option.SortOrder
+                })
+                .ToList()
         };
     }
 
