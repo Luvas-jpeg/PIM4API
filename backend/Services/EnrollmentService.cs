@@ -30,13 +30,14 @@ public class EnrollmentService
             item.LegacyProductId == product.Id);
 
         var student = await _context.Students.FirstOrDefaultAsync(s =>
-            s.Email == user.Email &&
+            s.UserId == user.ID &&
             s.CourseId == product.Id.ToString());
 
         if (student == null)
         {
             student = new Student
             {
+                UserId = user.ID,
                 Name = user.Nome,
                 Email = user.Email,
                 Phone = user.Phone,

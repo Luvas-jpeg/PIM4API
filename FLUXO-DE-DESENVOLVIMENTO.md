@@ -207,6 +207,21 @@ Ele valida:
 7. Pagamentos recusados ou cancelados liberam as vagas.
 8. Reembolsos cancelam as matriculas.
 
+### Regra consolidada de acesso
+
+- O usuario continua com a role global `Cliente`; nao existe uma role
+  `Student` obrigatoria.
+- O pagamento aprovado cria ou reutiliza um registro `Student` vinculado ao
+  `User.ID` por `Students.UserId` e cria a `Enrollment` do curso comprado.
+- A area do aluno e os endpoints de progresso, avaliacao e certificado
+  autorizam o acesso pela cadeia `User -> Student -> Enrollment`, sempre
+  limitada ao curso da matricula e ao seu status.
+- O e-mail permanece apenas como dado de contato e compatibilidade. Ele nao e
+  mais usado como chave de autorizacao.
+- A primeira migration cria `UserId` como nullable para preservar alunos
+  legados ou cadastros administrativos sem conta; novas compras sempre
+  preenchem esse campo.
+
 Arquivos principais:
 
 ```text
@@ -1184,6 +1199,38 @@ Ainda nao foi implementado:
 ### Objetivo
 
 Fortalecer autenticacao, autorizacao e protecao dos dados de alunos e pedidos.
+
+### Implementacao em andamento
+
+- JWT valida assinatura, emissor, audiencia, validade e usa tolerancia de relogio
+  de um minuto; segredo precisa ter pelo menos 32 bytes e expiracao maior que
+  zero e limitada a 24 horas.
+- Refresh tokens continuam com rotacao e revogacao, e agora sao armazenados
+  como hash SHA-256 no banco. Tokens antigos ainda validos sao convertidos para
+  hash na primeira renovacao, para preservar as sessoes durante a transicao.
+- Login bloqueia temporariamente a conta por 15 minutos apos cinco senhas
+  incorretas; o cadastro exige senha de 12 a 128 caracteres com maiuscula,
+  minuscula e numero.
+- Rate limiting por IP protege cadastro/login/refresh e webhook; checkout limita
+  por usuario autenticado, com fallback para IP.
+- CORS usa origens configuradas; producao falha ao iniciar sem uma lista
+  explicita. HTTPS e HSTS ficam ativos fora do ambiente de desenvolvimento.
+- O corpo HTTP tem limite de 1 MB e os servicos de autenticacao/perfil rejeitam
+  campos fora dos limites definidos.
+- Migration `AddAccountLockout` adiciona os campos do bloqueio; ainda nao foi
+  aplicada ao banco.
+- `Microsoft.AspNetCore.OpenApi` foi atualizado para 10.0.12 para resolver a
+  dependencia vulneravel `Microsoft.OpenApi` 2.0.0.
+
+### Revisoes pendentes
+
+- Revisar acesso horizontal em todos os recursos e testar roles administrativas.
+- Confirmar que segredos reais nao estao versionados e que logs nao registram
+  tokens, senhas ou dados pessoais.
+- Avaliar a concorrencia na rotacao de refresh tokens e definir o tratamento das
+  sessoes existentes apos habilitar armazenamento por hash.
+- Validar o pipeline de CI e executar os testes de seguranca antes de concluir
+  a etapa.
 
 ### Entregas
 

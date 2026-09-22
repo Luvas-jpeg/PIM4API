@@ -51,7 +51,7 @@ namespace EquipamentosMedicosApi.Controllers
                 .Include(e => e.Class)
                     .ThenInclude(c => c!.Produto)
                 .Include(e => e.Student)
-                .Where(e => e.Student != null && e.Student.Email == user.Email)
+                .Where(e => e.Student != null && e.Student.UserId == userId.Value)
                 .OrderByDescending(e => e.EnrolledAt)
                 .ToListAsync();
 
@@ -138,7 +138,7 @@ namespace EquipamentosMedicosApi.Controllers
                 .FirstOrDefaultAsync(item =>
                     item.Id == enrollmentId &&
                     item.Student != null &&
-                    item.Student.Email == user.Email);
+                    item.Student.UserId == userId.Value);
 
             if (enrollment == null)
                 return NotFound(new { message = "Matricula nao encontrada." });
@@ -478,12 +478,11 @@ namespace EquipamentosMedicosApi.Controllers
 
         private async Task<bool> UserHasCourseAccessAsync(int userId, int courseId)
         {
-            var user = await _context.Users.FindAsync(userId);
-            if (user == null) return false;
+            if (!await _context.Users.AnyAsync(item => item.ID == userId)) return false;
 
             return await _context.Enrollments.AnyAsync(enrollment =>
                 enrollment.Student != null &&
-                enrollment.Student.Email == user.Email &&
+                enrollment.Student.UserId == userId &&
                 enrollment.Status != "cancelled" &&
                 (enrollment.CourseId == courseId ||
                  (enrollment.Class != null && enrollment.Class.CourseId == courseId)));

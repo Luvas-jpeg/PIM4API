@@ -1,4 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using System.Net.Mail;
+using System.Security.Cryptography;
+using System.Text;
 using EquipamentosMedicosApi.Data;
 using EquipamentosMedicosApi.DTOs;
 using EquipamentosMedicosApi.Models;
@@ -7,6 +10,9 @@ namespace EquipamentosMedicosApi.Services;
 
 public class AuthService
 {
+    private const int MaxFailedLoginAttempts = 5;
+    private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
+    private static readonly TimeSpan RefreshTokenLifetime = TimeSpan.FromDays(30);
     private readonly AppDbContext _context;
     private readonly TokenService _tokenService;
 
@@ -18,7 +24,19 @@ public class AuthService
 
     public async Task<AuthServiceResult<int>> RegisterAsync(RegistroDTO request)
     {
+        if (string.IsNullOrWhiteSpace(request.Nome) || request.Nome.Length > 120 ||
+            string.IsNullOrWhiteSpace(request.Email) || request.Email.Length > 254 ||
+            string.IsNullOrWhiteSpace(request.Cpf) || request.Cpf.Length > 14 ||
+            string.IsNullOrWhiteSpace(request.Phone) || request.Phone.Length > 20)
+        {
+            return AuthServiceResult<int>.Fail("Confira os dados informados e tente novamente.");
+        }
+
         var email = request.Email.Trim().ToLower();
+        if (!IsValidEmail(email))
+        {
+            return AuthServiceResult<int>.Fail("E-mail invalido.");
+        }
 
         var emailExists = await _context.Users.AnyAsync(user => user.Email == email);
 
@@ -30,6 +48,12 @@ public class AuthService
         if (!IsValidCpf(request.Cpf))
         {
             return AuthServiceResult<int>.Fail("CPF inválido.");
+        }
+
+        if (!IsValidPassword(request.Senha))
+        {
+            return AuthServiceResult<int>.Fail(
+                "A senha deve ter ao menos 12 caracteres, letras maiusculas, minusculas e numeros.");
         }
 
         var user = new User
@@ -50,14 +74,46 @@ public class AuthService
 
     public async Task<AuthServiceResult<LoginResponse>> LoginAsync(LoginDTO request)
     {
+        if (string.IsNullOrWhiteSpace(request.Email) || request.Email.Length > 254 ||
+            string.IsNullOrWhiteSpace(request.Senha) || request.Senha.Length > 128)
+        {
+            return AuthServiceResult<LoginResponse>.Fail("E-mail ou senha invÃ¡lidos.");
+        }
+
         var email = request.Email.Trim().ToLower();
+        if (!IsValidEmail(email))
+        {
+            return AuthServiceResult<LoginResponse>.Fail("E-mail ou senha invÃ¡lidos.");
+        }
 
         var user = await _context.Users.FirstOrDefaultAsync(user => user.Email == email);
 
-        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Senha, user.SenhaHash))
+        if (user == null)
         {
             return AuthServiceResult<LoginResponse>.Fail("E-mail ou senha inválidos.");
         }
+
+        var now = DateTime.UtcNow;
+        if (user.LockoutEnd.HasValue && user.LockoutEnd > now)
+        {
+            return AuthServiceResult<LoginResponse>.Fail("Credenciais invalidas.");
+        }
+
+        if (!BCrypt.Net.BCrypt.Verify(request.Senha, user.SenhaHash))
+        {
+            user.FailedLoginAttempts++;
+            if (user.FailedLoginAttempts >= MaxFailedLoginAttempts)
+            {
+                user.FailedLoginAttempts = 0;
+                user.LockoutEnd = now.Add(LockoutDuration);
+            }
+
+            await _context.SaveChangesAsync();
+            return AuthServiceResult<LoginResponse>.Fail("Credenciais invalidas.");
+        }
+
+        user.FailedLoginAttempts = 0;
+        user.LockoutEnd = null;
 
         var accessToken = _tokenService.GenerateToken(user);
 
@@ -65,9 +121,9 @@ public class AuthService
         var refreshTokenValue = GenerateRefreshTokenValue();
         var refresh = new RefreshToken
         {
-            Token = refreshTokenValue,
+            Token = HashToken(refreshTokenValue),
             UserId = user.ID,
-            ExpiresAt = DateTime.UtcNow.AddDays(30)
+            ExpiresAt = now.Add(RefreshTokenLifetime)
         };
 
         _context.RefreshTokens.Add(refresh);
@@ -77,7 +133,7 @@ public class AuthService
         {
             AccessToken = accessToken,
             RefreshToken = refreshTokenValue,
-            ExpiresIn = (int)TimeSpan.FromHours(24).TotalSeconds,
+            ExpiresIn = _tokenService.GetAccessTokenLifetimeSeconds(),
             User = ToResponse(user)
         };
 
@@ -86,8 +142,14 @@ public class AuthService
 
     public async Task<AuthServiceResult<LoginResponse>> RefreshAsync(string refreshToken)
     {
+        if (string.IsNullOrWhiteSpace(refreshToken))
+        {
+            return AuthServiceResult<LoginResponse>.Fail("Refresh token invalido ou expirado.");
+        }
+
+        var tokenHash = HashToken(refreshToken);
         var token = await _context.RefreshTokens.Include(rt => rt.User)
-            .FirstOrDefaultAsync(rt => rt.Token == refreshToken);
+            .FirstOrDefaultAsync(rt => rt.Token == tokenHash || rt.Token == refreshToken);
 
         if (token == null || !token.IsActive)
         {
@@ -95,16 +157,17 @@ public class AuthService
         }
 
         // rotate token: revoke old and create new
+        token.Token = tokenHash;
         token.RevokedAt = DateTime.UtcNow;
 
         var newRefreshValue = GenerateRefreshTokenValue();
-        token.ReplacedByToken = newRefreshValue;
+        token.ReplacedByToken = HashToken(newRefreshValue);
 
         var newRefresh = new RefreshToken
         {
-            Token = newRefreshValue,
+            Token = HashToken(newRefreshValue),
             UserId = token.UserId,
-            ExpiresAt = DateTime.UtcNow.AddDays(30)
+            ExpiresAt = DateTime.UtcNow.Add(RefreshTokenLifetime)
         };
 
         _context.RefreshTokens.Add(newRefresh);
@@ -116,7 +179,7 @@ public class AuthService
         {
             AccessToken = access,
             RefreshToken = newRefreshValue,
-            ExpiresIn = (int)TimeSpan.FromHours(24).TotalSeconds,
+            ExpiresIn = _tokenService.GetAccessTokenLifetimeSeconds(),
             User = ToResponse(token.User!)
         };
 
@@ -143,8 +206,25 @@ public class AuthService
         return Convert.ToBase64String(bytes);
     }
 
+    private static string HashToken(string token)
+    {
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+    }
+
     public async Task<AuthServiceResult<UserResponseDTO>> UpdateProfileAsync(int userId, UpdateProfileDTO request)
     {
+        if (string.IsNullOrWhiteSpace(request.Nome) || request.Nome.Length > 120 ||
+            string.IsNullOrWhiteSpace(request.Email) || request.Email.Length > 254 ||
+            string.IsNullOrWhiteSpace(request.Cpf) || request.Cpf.Length > 14 ||
+            string.IsNullOrWhiteSpace(request.Phone) || request.Phone.Length > 20 ||
+            (request.Street?.Length ?? 0) > 160 || (request.Number?.Length ?? 0) > 20 ||
+            (request.Complement?.Length ?? 0) > 120 || (request.Neighborhood?.Length ?? 0) > 120 ||
+            (request.City?.Length ?? 0) > 120 || (request.State?.Length ?? 0) > 2 ||
+            (request.ZipCode?.Length ?? 0) > 10)
+        {
+            return AuthServiceResult<UserResponseDTO>.Fail("Confira os dados informados e tente novamente.");
+        }
+
         var user = await _context.Users.FirstOrDefaultAsync(user => user.ID == userId);
 
         if (user == null)
@@ -153,6 +233,10 @@ public class AuthService
         }
 
         var email = request.Email.Trim().ToLower();
+        if (!IsValidEmail(email))
+        {
+            return AuthServiceResult<UserResponseDTO>.Fail("E-mail invalido.");
+        }
 
         if (string.IsNullOrWhiteSpace(request.Nome) || string.IsNullOrWhiteSpace(email))
         {
@@ -176,13 +260,13 @@ public class AuthService
         user.Email = email;
         user.Cpf = request.Cpf.Trim();
         user.Phone = request.Phone.Trim();
-        user.Street = request.Street.Trim();
-        user.Number = request.Number.Trim();
-        user.Complement = request.Complement.Trim();
-        user.Neighborhood = request.Neighborhood.Trim();
-        user.City = request.City.Trim();
-        user.State = request.State.Trim();
-        user.ZipCode = request.ZipCode.Trim();
+        user.Street = request.Street?.Trim() ?? string.Empty;
+        user.Number = request.Number?.Trim() ?? string.Empty;
+        user.Complement = request.Complement?.Trim() ?? string.Empty;
+        user.Neighborhood = request.Neighborhood?.Trim() ?? string.Empty;
+        user.City = request.City?.Trim() ?? string.Empty;
+        user.State = request.State?.Trim() ?? string.Empty;
+        user.ZipCode = request.ZipCode?.Trim() ?? string.Empty;
 
         await _context.SaveChangesAsync();
 
@@ -207,6 +291,18 @@ public class AuthService
             ZipCode = user.ZipCode,
             Role = user.Role
         };
+    }
+
+    private static bool IsValidPassword(string password)
+    {
+        return !string.IsNullOrEmpty(password) && password.Length >= 12 && password.Length <= 128 &&
+               password.Any(char.IsUpper) && password.Any(char.IsLower) && password.Any(char.IsDigit);
+    }
+
+    private static bool IsValidEmail(string email)
+    {
+        return MailAddress.TryCreate(email, out var parsed) &&
+               string.Equals(parsed.Address, email, StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsValidCpf(string cpf)

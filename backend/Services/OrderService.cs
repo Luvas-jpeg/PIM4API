@@ -168,7 +168,7 @@ public class OrderService
             .ToList();
 
         var studentStatuses = await _context.Students
-            .Where(student => student.Email == user.Email && courseIds.Contains(student.CourseId))
+            .Where(student => student.UserId == user.ID && courseIds.Contains(student.CourseId))
             .ToDictionaryAsync(student => student.CourseId, student => student.Status);
 
         var response = orders.Select(order => new OrderResponse

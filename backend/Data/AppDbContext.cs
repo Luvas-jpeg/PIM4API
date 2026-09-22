@@ -228,6 +228,15 @@ namespace EquipamentosMedicosApi.Data
                 .HasForeignKey(enrollment => enrollment.StudentId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<Student>()
+                .HasOne(student => student.User)
+                .WithMany()
+                .HasForeignKey(student => student.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Student>()
+                .HasIndex(student => student.UserId);
+
             modelBuilder.Entity<Enrollment>()
                 .HasOne(enrollment => enrollment.Order)
                 .WithMany(order => order.Enrollments)

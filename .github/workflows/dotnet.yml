@@ -1,7 +1,7 @@
 # This workflow will build a .NET project
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
 
-name: .NET
+name: Backend CI
 
 on:
   push:
@@ -13,16 +13,24 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
 
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 8.0.x
+        dotnet-version: 10.0.x
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore ./backend.Tests/backend.Tests.csproj
     - name: Build
-      run: dotnet build --no-restore
+      run: dotnet build ./backend.Tests/backend.Tests.csproj --configuration Release --no-restore
     - name: Test
-      run: dotnet test --no-build --verbosity normal
+      run: dotnet test ./backend.Tests/backend.Tests.csproj --configuration Release --no-build --verbosity normal
+    - name: Check vulnerable packages
+      run: dotnet list ./backend/backend.csproj package --vulnerable --include-transitive
+
+    # dotnet format is intentionally not blocking yet because the current
+    # legacy codebase still has pre-existing formatting issues.

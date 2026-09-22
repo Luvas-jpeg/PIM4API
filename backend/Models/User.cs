@@ -16,6 +16,8 @@ namespace EquipamentosMedicosApi.Models
         public string ZipCode {get; set;} = string.Empty;
         public string SenhaHash {get; set;} = string.Empty;
         public string Role {get; set;} = "Cliente";
+        public int FailedLoginAttempts { get; set; }
+        public DateTime? LockoutEnd { get; set; }
 
         public ICollection<Order> Pedidos {get; set;} = new List<Order>();
     }

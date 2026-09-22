@@ -15,6 +15,17 @@ public class TokenService
         _config = config;
     }
 
+    public static TimeSpan GetAccessTokenLifetime(IConfiguration config)
+    {
+        if (!double.TryParse(config["Jwt:ExpirationHours"], out var hours) ||
+            hours <= 0 || hours > 24)
+        {
+            throw new InvalidOperationException("Jwt:ExpirationHours deve estar entre 0 e 24 horas.");
+        }
+
+        return TimeSpan.FromHours(hours);
+    }
+
     public string GenerateToken(User user)
     {
         var secret = _config["Jwt:Secret"];
@@ -37,18 +48,21 @@ public class TokenService
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
-        var expiration = double.TryParse(_config["Jwt:ExpirationHours"], out var hours)
-            ? hours
-            : 24;
+        var lifetime = GetAccessTokenLifetime(_config);
 
         var token = new JwtSecurityToken(
             issuer: _config["Jwt:Issuer"],
             audience: _config["Jwt:Audience"],
             claims: claims,
-            expires: DateTime.UtcNow.AddHours(expiration),
+            expires: DateTime.UtcNow.Add(lifetime),
             signingCredentials: credentials
         );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    public int GetAccessTokenLifetimeSeconds()
+    {
+        return (int)GetAccessTokenLifetime(_config).TotalSeconds;
     }
 }
