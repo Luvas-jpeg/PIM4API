@@ -60,6 +60,8 @@ public class CourseService
             .Where(course => !string.IsNullOrWhiteSpace(request.Category)
                 ? course.Category == request.Category
                 : true)
+            .Where(course => string.IsNullOrWhiteSpace(request.DeliveryMode)
+                || course.DeliveryMode == request.DeliveryMode.Trim().ToLower())
             .Where(course => string.IsNullOrWhiteSpace(request.Search)
                 || course.Nome.Contains(request.Search)
                 || course.Description.Contains(request.Search))

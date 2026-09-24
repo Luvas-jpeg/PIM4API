@@ -165,6 +165,7 @@ public class CourseCatalogQueryDTO
 {
     public string? Search { get; set; }
     public string? Category { get; set; }
+    public string? DeliveryMode { get; set; }
     public string? City { get; set; }
     public DateTime? StartDate { get; set; }
     public DateTime? EndDate { get; set; }
