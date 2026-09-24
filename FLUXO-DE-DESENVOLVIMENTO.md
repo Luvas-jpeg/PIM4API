@@ -11,7 +11,8 @@ todos os clientes.
 - PostgreSQL 17;
 - Frontend Angular 21;
 - Mobile Flutter, ainda a ser criado;
-- Desktop administrativo, ainda a ser definido;
+- Desktop administrativo como painel web protegido, otimizado para telas
+  maiores; um executavel desktop separado nao e necessario neste momento;
 - Docker Compose para PostgreSQL, API e frontend.
 
 O sistema deixou de ser um ecommerce de equipamentos medicos. O escopo atual e
@@ -23,8 +24,8 @@ previsao de cursos hibridos neste momento.
 ```text
 Backend:  E:\Projetos\PIM4API
 Frontend: E:\Projetos\PIM4Front
-Mobile:   a definir
-Desktop:  a definir
+Mobile:   aplicativo Flutter do estudante, a definir
+Desktop:  painel administrativo web em Angular
 ```
 
 O antigo caminho `E:\Projetos\e-commerce` nao existe mais. Uma sessao antiga do terminal tentou iniciar nesse diretorio e apresentou `os error 267`. Esse erro significa que o diretorio de trabalho inicial e invalido; nao indica problema no Docker Engine.
@@ -1199,6 +1200,20 @@ Ainda nao foi implementado:
 ### Objetivo
 
 Fortalecer autenticacao, autorizacao e protecao dos dados de alunos e pedidos.
+
+### Decisao de plataformas
+
+- O frontend Angular sera responsivo para a experiencia publica e para a area
+  do aluno, funcionando em desktop e navegador mobile.
+- O painel administrativo sera uma area protegida do mesmo frontend, otimizada
+  para desktop e sem necessidade de um aplicativo desktop separado nesta
+  etapa.
+- O aplicativo Flutter sera focado no aluno: aulas EAD, progresso, avaliacoes,
+  certificados e informacoes de cursos presenciais.
+- Angular e Flutter consumirao a mesma API, sem duplicar regras de compra,
+  matricula, permissao ou certificado no cliente.
+- A API continuara sendo a autoridade: o aluno so acessa um curso quando
+  possuir uma `Enrollment` ativa vinculada ao seu `UserId`.
 
 ### Implementacao em andamento
 
