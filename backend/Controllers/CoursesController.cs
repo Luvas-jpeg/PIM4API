@@ -18,8 +18,9 @@ public class CoursesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] bool includeInactive = false)
-        => Ok(await _courseService.GetAllAsync(includeInactive));
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetAll()
+        => Ok(await _courseService.GetAllAsync(includeInactive: true));
 
     [HttpGet("catalog")]
     public async Task<IActionResult> GetCatalog([FromQuery] CourseCatalogQueryDTO request)
@@ -30,9 +31,9 @@ public class CoursesController : ControllerBase
         => Ok(await _courseService.GetCatalogOptionsAsync());
 
     [HttpGet("{id:int}")]
-    public async Task<IActionResult> GetById(int id, [FromQuery] bool includeInactive = false)
+    public async Task<IActionResult> GetById(int id)
     {
-        var course = await _courseService.GetByIdAsync(id, includeInactive);
+        var course = await _courseService.GetByIdAsync(id);
         return course == null ? NotFound(new { message = "Curso nao encontrado." }) : Ok(course);
     }
 
@@ -156,6 +157,7 @@ public class CoursesController : ControllerBase
     }
 
     [HttpGet("{courseId:int}/modules")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetModules(int courseId)
     {
         var modules = await _courseService.GetModulesAsync(courseId);

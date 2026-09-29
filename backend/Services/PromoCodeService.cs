@@ -106,27 +106,6 @@ public class PromoCodeService
 
         return ServiceResult<PromoCodeDTO>.Ok(ToResponse(promoCode));
     }
-
-    public async Task<ServiceResult<PromoCodeDTO>> UseAsync(int id)
-    {
-        var promoCode = await _context.PromoCodes.FirstOrDefaultAsync(promoCode => promoCode.Id == id);
-
-        if (promoCode == null)
-        {
-            return ServiceResult<PromoCodeDTO>.Fail("Codigo promocional nao encontrado.");
-        }
-
-        if (!IsValidForUse(promoCode))
-        {
-            return ServiceResult<PromoCodeDTO>.Fail("Codigo invalido, expirado ou ja utilizado.");
-        }
-
-        promoCode.UsageCount += 1;
-        await _context.SaveChangesAsync();
-
-        return ServiceResult<PromoCodeDTO>.Ok(ToResponse(promoCode));
-    }
-
     public async Task<bool> DeleteAsync(int id)
     {
         var promoCode = await _context.PromoCodes.FirstOrDefaultAsync(promoCode => promoCode.Id == id);

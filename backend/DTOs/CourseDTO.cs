@@ -12,6 +12,8 @@ public class CourseResponseDTO
     public int WorkloadHours { get; set; }
     public bool IsActive { get; set; }
     public int? LegacyProductId { get; set; }
+    public int ModuleCount { get; set; }
+    public int LessonCount { get; set; }
     public List<CourseClassResponseDTO> Classes { get; set; } = new();
     public List<CourseModuleResponseDTO> Modules { get; set; } = new();
     public List<CourseAssessmentResponseDTO> Assessments { get; set; } = new();

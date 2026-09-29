@@ -187,6 +187,39 @@ public sealed class OrderPaymentFlowTests
             .SingleAsync(product => product.Id == fixture.CourseId)).Estoque);
     }
 
+    [Fact]
+    public async Task UserCannotReadAnotherUsersOrder()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var service = fixture.CreateOrderService();
+        var orderResult = await service.CreateAsync(fixture.UserId, CreateRequest());
+
+        var result = await service.GetByIdAsync(
+            fixture.AnotherUserId,
+            orderResult.Data!.OrderId);
+
+        Assert.False(result.Success);
+        Assert.Equal("Pedido nao encontrado.", result.Error);
+    }
+
+    [Fact]
+    public async Task UserCannotCancelAnotherUsersOrder()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var service = fixture.CreateOrderService();
+        var orderResult = await service.CreateAsync(fixture.UserId, CreateRequest());
+
+        var result = await service.CancelAsync(
+            fixture.AnotherUserId,
+            orderResult.Data!.OrderId);
+
+        Assert.False(result.Success);
+        Assert.Equal("Pedido nao encontrado.", result.Error);
+        var order = await fixture.Context.Orders.SingleAsync();
+        Assert.Equal("pending", order.Status);
+        Assert.Equal("pending", order.PaymentStatus);
+    }
+
     private static CreateOrderDTO CreateRequest()
     {
         return new CreateOrderDTO
@@ -204,6 +237,7 @@ public sealed class OrderPaymentFlowTests
         private readonly DbConnection _connection;
         public AppDbContext Context { get; }
         public int UserId { get; } = 99;
+        public int AnotherUserId { get; } = 100;
         public int CourseId { get; } = 99;
 
         private TestFixture(DbConnection connection, AppDbContext context)
@@ -229,6 +263,15 @@ public sealed class OrderPaymentFlowTests
                 Nome = "Aluno Teste",
                 Email = "aluno.teste@example.com",
                 Cpf = "52998224725",
+                SenhaHash = "hash",
+                Role = "Cliente"
+            });
+            context.Users.Add(new User
+            {
+                ID = 100,
+                Nome = "Outro Aluno",
+                Email = "outro.aluno@example.com",
+                Cpf = "16899535009",
                 SenhaHash = "hash",
                 Role = "Cliente"
             });

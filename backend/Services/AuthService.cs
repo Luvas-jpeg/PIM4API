@@ -147,45 +147,56 @@ public class AuthService
             return AuthServiceResult<LoginResponse>.Fail("Refresh token invalido ou expirado.");
         }
 
+        var now = DateTime.UtcNow;
         var tokenHash = HashToken(refreshToken);
-        var token = await _context.RefreshTokens.Include(rt => rt.User)
-            .FirstOrDefaultAsync(rt => rt.Token == tokenHash || rt.Token == refreshToken);
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        var token = await _context.RefreshTokens
+            .AsNoTracking()
+            .Include(item => item.User)
+            .FirstOrDefaultAsync(item => item.Token == tokenHash || item.Token == refreshToken);
 
-        if (token == null || !token.IsActive)
+        if (token == null || token.RevokedAt != null || token.ExpiresAt < now || token.User == null)
         {
-            return AuthServiceResult<LoginResponse>.Fail("Refresh token inválido ou expirado.");
+            return AuthServiceResult<LoginResponse>.Fail("Refresh token invalido ou expirado.");
         }
 
-        // rotate token: revoke old and create new
-        token.Token = tokenHash;
-        token.RevokedAt = DateTime.UtcNow;
-
         var newRefreshValue = GenerateRefreshTokenValue();
-        token.ReplacedByToken = HashToken(newRefreshValue);
+        var newRefreshHash = HashToken(newRefreshValue);
+        var rotatedTokens = await _context.RefreshTokens
+            .Where(item =>
+                item.Id == token.Id &&
+                item.RevokedAt == null &&
+                item.ExpiresAt >= now &&
+                (item.Token == tokenHash || item.Token == refreshToken))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(item => item.Token, tokenHash)
+                .SetProperty(item => item.RevokedAt, now)
+                .SetProperty(item => item.ReplacedByToken, newRefreshHash));
 
-        var newRefresh = new RefreshToken
+        if (rotatedTokens != 1)
         {
-            Token = HashToken(newRefreshValue),
+            await transaction.RollbackAsync();
+            return AuthServiceResult<LoginResponse>.Fail("Refresh token invalido ou expirado.");
+        }
+
+        _context.RefreshTokens.Add(new RefreshToken
+        {
+            Token = newRefreshHash,
             UserId = token.UserId,
-            ExpiresAt = DateTime.UtcNow.Add(RefreshTokenLifetime)
-        };
-
-        _context.RefreshTokens.Add(newRefresh);
+            ExpiresAt = now.Add(RefreshTokenLifetime)
+        });
         await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
 
-        var access = _tokenService.GenerateToken(token.User!);
-
-        var response = new LoginResponse
+        var access = _tokenService.GenerateToken(token.User);
+        return AuthServiceResult<LoginResponse>.Ok(new LoginResponse
         {
             AccessToken = access,
             RefreshToken = newRefreshValue,
             ExpiresIn = _tokenService.GetAccessTokenLifetimeSeconds(),
-            User = ToResponse(token.User!)
-        };
-
-        return AuthServiceResult<LoginResponse>.Ok(response);
+            User = ToResponse(token.User)
+        });
     }
-
     public async Task<bool> LogoutAsync(int userId)
     {
         var tokens = await _context.RefreshTokens.Where(rt => rt.UserId == userId && rt.RevokedAt == null).ToListAsync();

@@ -33,7 +33,7 @@ public class CourseService
         }
 
         return (await query.OrderBy(course => course.Nome).ToListAsync())
-            .Select(ToResponse)
+            .Select(course => ToResponse(course, includeContent: true))
             .ToList();
     }
 
@@ -108,7 +108,7 @@ public class CourseService
 
         return new PagedCourseResponseDTO
         {
-            Items = items.Select(ToResponse).ToList(),
+            Items = items.Select(course => ToResponse(course, includeContent: false)).ToList(),
             Page = page,
             PageSize = pageSize,
             TotalItems = totalItems,
@@ -154,7 +154,7 @@ public class CourseService
         };
     }
 
-    public async Task<CourseResponseDTO?> GetByIdAsync(int id, bool includeInactive = false)
+    public async Task<CourseResponseDTO?> GetByIdAsync(int id)
     {
         var course = await _context.Courses
             .Include(item => item.Classes)
@@ -164,9 +164,9 @@ public class CourseService
                 .ThenInclude(assessment => assessment.Questions)
                     .ThenInclude(question => question.Options)
             .AsNoTracking()
-            .FirstOrDefaultAsync(item => item.Id == id && (includeInactive || item.IsActive));
+            .FirstOrDefaultAsync(item => item.Id == id && item.IsActive);
 
-        return course == null ? null : ToResponse(course);
+        return course == null ? null : ToResponse(course, includeContent: false);
     }
 
     public async Task<ServiceResult<CourseResponseDTO>> CreateAsync(CourseRequestDTO request, int? userId = null)
@@ -972,7 +972,7 @@ public class CourseService
         course.LegacyProduct.Estoque ??= 0;
     }
 
-    private static CourseResponseDTO ToResponse(Course course)
+    private static CourseResponseDTO ToResponse(Course course, bool includeContent = true)
     {
         return new CourseResponseDTO
         {
@@ -986,22 +986,30 @@ public class CourseService
             WorkloadHours = course.WorkloadHours,
             IsActive = course.IsActive,
             LegacyProductId = course.LegacyProductId,
+            ModuleCount = course.Modules.Count(item => item.IsActive),
+            LessonCount = course.Modules
+                .Where(item => item.IsActive)
+                .Sum(item => item.Lessons.Count(lesson => lesson.IsActive)),
             Classes = course.Classes
                 .Where(item => item.Status != "cancelled")
                 .OrderBy(item => item.DataRealizacao)
                 .Select(ToClassResponse)
                 .ToList(),
-            Modules = course.Modules
-                .Where(item => item.IsActive)
-                .OrderBy(item => item.SortOrder)
-                .ThenBy(item => item.Title)
-                .Select(ToModuleResponse)
-                .ToList(),
-            Assessments = course.Assessments
-                .Where(item => item.IsActive)
-                .OrderBy(item => item.Title)
-                .Select(ToAssessmentResponse)
-                .ToList()
+            Modules = includeContent
+                ? course.Modules
+                    .Where(item => item.IsActive)
+                    .OrderBy(item => item.SortOrder)
+                    .ThenBy(item => item.Title)
+                    .Select(ToModuleResponse)
+                    .ToList()
+                : new List<CourseModuleResponseDTO>(),
+            Assessments = includeContent
+                ? course.Assessments
+                    .Where(item => item.IsActive)
+                    .OrderBy(item => item.Title)
+                    .Select(ToAssessmentResponse)
+                    .ToList()
+                : new List<CourseAssessmentResponseDTO>()
         };
     }
 

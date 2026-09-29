@@ -1239,13 +1239,47 @@ Fortalecer autenticacao, autorizacao e protecao dos dados de alunos e pedidos.
 
 ### Revisoes pendentes
 
-- Revisar acesso horizontal em todos os recursos e testar roles administrativas.
-- Confirmar que segredos reais nao estao versionados e que logs nao registram
+- Confirmar a execucao do workflow de CI no GitHub apos o commit.
+
+### Incremento de autorizacao por recurso
+
+- A consulta administrativa de modulos e aulas EAD em
+  `GET /api/courses/{courseId}/modules` passou a exigir a role `Admin`; o
+  endpoint retornava inclusive a URL dos videos e nao deve funcionar como rota
+  publica de conteudo.
+- O catalogo e o detalhe publico agora retornam somente as contagens de modulos
+  e aulas. Modulos, URLs de video, avaliacoes e respostas permanecem apenas nas
+  rotas protegidas. A listagem completa de cursos tambem passou a exigir `Admin`.
+- O parametro publico `includeInactive` foi removido para impedir a consulta de
+  cursos arquivados fora do painel administrativo.
+- O aluno continua acessando modulos, aulas e avaliacoes pela matricula em
+  `GET /api/me/enrollments/{id}`, cuja consulta exige que a matricula esteja
+  vinculada ao `UserId` autenticado.
+- Foram adicionados testes que garantem que um usuario nao consegue consultar
+  nem cancelar o pedido pertencente a outro usuario.
+- Testes da area do aluno confirmam que matricula, progresso e certificado
+  somente podem ser consultados pelo usuario vinculado ao `Student.UserId`;
+  matriculas canceladas tambem nao concedem acesso ao conteudo.
+- O endpoint `POST /api/PromoCodes/{id}/use` foi removido porque permitia que
+  um usuario autenticado consumisse o limite de um cupom sem concluir um
+  pedido. O uso do cupom permanece exclusivamente no fluxo de criacao do
+  pedido.
+- Testes de politica verificam que conteudo EAD administrativo, pedidos,
+  webhooks, cupons, auditoria e gestao de alunos exigem a role `Admin`.
+- A rotacao de refresh token passou a revogar o token anterior com uma
+  atualizacao condicional atomica dentro de transacao. Requisicoes concorrentes
+  nao podem mais gerar dois tokens substitutos validos.
+- A compatibilidade com tokens legados em texto puro foi preservada: no
+  primeiro uso valido, o registro antigo e convertido para hash e revogado.
+- Testes cobrem armazenamento por hash, rotacao, migracao do formato legado e
+  rejeicao da reutilizacao do token anterior.
+- Testes do webhook garantem rejeicao quando o segredo nao esta configurado e
+  quando a assinatura HMAC esta ausente ou invalida.
+- A revisao de configuracao confirmou que segredos reais nao estao versionados;
+  arquivos locais e de producao estao ignorados, e os logs atuais nao incluem
   tokens, senhas ou dados pessoais.
-- Avaliar a concorrencia na rotacao de refresh tokens e definir o tratamento das
-  sessoes existentes apos habilitar armazenamento por hash.
-- Validar o pipeline de CI e executar os testes de seguranca antes de concluir
-  a etapa.
+- Validacao deste incremento: 50 testes do backend aprovados e nenhum pacote
+  vulneravel reportado pelo NuGet nas fontes atuais.
 
 ### Entregas
 

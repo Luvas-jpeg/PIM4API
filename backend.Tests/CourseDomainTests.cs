@@ -353,6 +353,53 @@ public sealed class CourseDomainTests
     }
 
     [Fact]
+    public async Task PublicCourseResponsesHideEadContentAndKeepSafeCounts()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var course = new Course
+        {
+            Nome = "Curso EAD protegido",
+            Preco = 100m,
+            DeliveryMode = "ead",
+            IsActive = true,
+            Modules = new List<CourseModule>
+            {
+                new()
+                {
+                    Title = "Modulo protegido",
+                    Lessons = new List<CourseLesson>
+                    {
+                        new() { Title = "Aula protegida", VideoUrl = "https://video.example/private" }
+                    }
+                }
+            },
+            Assessments = new List<CourseAssessment>
+            {
+                new() { Title = "Avaliacao protegida" }
+            }
+        };
+        fixture.Context.Courses.Add(course);
+        await fixture.Context.SaveChangesAsync();
+        var service = new CourseService(fixture.Context);
+
+        var catalog = await service.GetCatalogAsync(new CourseCatalogQueryDTO());
+        var detail = await service.GetByIdAsync(course.Id);
+        var administrative = await service.GetAllAsync(includeInactive: true);
+
+        var catalogCourse = Assert.Single(catalog.Items);
+        Assert.Empty(catalogCourse.Modules);
+        Assert.Empty(catalogCourse.Assessments);
+        Assert.Equal(1, catalogCourse.ModuleCount);
+        Assert.Equal(1, catalogCourse.LessonCount);
+        Assert.NotNull(detail);
+        Assert.Empty(detail!.Modules);
+        Assert.Empty(detail.Assessments);
+        var administrativeCourse = Assert.Single(administrative);
+        Assert.Single(administrativeCourse.Modules);
+        Assert.Single(administrativeCourse.Assessments);
+        Assert.Equal("https://video.example/private", administrativeCourse.Modules[0].Lessons[0].VideoUrl);
+    }
+    [Fact]
     public async Task CourseCanBeArchivedAndRestoredWithoutDeletingItsHistory()
     {
         await using var fixture = await TestFixture.CreateAsync();

@@ -94,26 +94,6 @@ namespace EquipamentosMedicosApi.Controllers
 
             return Ok(result.Data);
         }
-
-        [HttpPost("{id}/use")]
-        [Authorize]
-        public async Task<IActionResult> Use(int id)
-        {
-            var result = await _promoCodeService.UseAsync(id);
-
-            if (!result.Success)
-            {
-                if (IsNotFound(result.Error))
-                {
-                    return NotFound(new { message = result.Error });
-                }
-
-                return BadRequest(new { message = result.Error });
-            }
-
-            return Ok(result.Data);
-        }
-
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)
