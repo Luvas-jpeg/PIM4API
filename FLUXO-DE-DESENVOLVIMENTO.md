@@ -1,5 +1,104 @@
 # Fluxo de desenvolvimento - Plataforma de cursos
 
+## Area do aluno dedicada no site - 08/10/2026
+
+- Nova pagina Angular protegida em /area-aluno, consumindo GET /api/me/courses.
+- Exibe matriculas ativas, concluidas e canceladas, busca por curso/local/
+  instrutor e filtro por status. Inclui carregamento, vazio, erro e retry.
+- Detalhes em /area-aluno/matricula/{enrollmentId}; o ID usado e da matricula,
+  nao do curso. /conta/matricula/{id} redireciona para a nova rota protegida.
+- /conta concentra perfil e pedidos, com atalho para a area do aluno.
+- Menu, card da homepage e retorno dos detalhes apontam para /area-aluno.
+- Usa dados reais de matriculas; pedido pending nao libera acesso ao curso.
+- 45 testes frontend aprovados, incluindo filtros, links por ID da matricula,
+  estado vazio apos pagamento, encerramento de loading no erro e retry.
+- Aplicativo Android permanece uma entrega separada, ainda nao implementada.
+
+## Disponibilidade das turmas - correcao em 08/10/2026
+
+- Ver detalhes no catalogo abre /curso/{CourseId}; a tela consulta
+  GET /api/courses/{id} e usa Classes relacionadas por CourseId.
+- Catalogo e detalhe consideram horario de inicio, status scheduled e vagas.
+  O catalogo nao anuncia como disponivel uma turma que ja iniciou hoje.
+- Home tambem filtra horario futuro; detalhe mostra Sem turma disponivel,
+  evitando indicar lotacao quando o problema e a ausencia de turma elegivel.
+- Formulario do admin explica que inscricoes encerram no horario de inicio.
+- Turma local 1/curso 8 tinha 30 vagas, mas inicio 08/10/2026 14:51 no fuso
+  Sao Paulo; ja estava iniciada durante o teste. Data nao foi alterada.
+- 68 testes backend e 40 frontend aprovados, incluindo regressao de turma
+  iniciada no mesmo dia e turma futura com vagas.
+
+## Confirmacao local de pagamento para testar a area do aluno
+
+O script scripts/Confirm-LocalPayment.ps1 assina o JSON do webhook interno
+com HMAC-SHA256 usando Payments__WebhookSecret do .env, sem exibir a chave.
+Aceita somente endereco local. Nao e integracao Asaas nem pagamento real.
+
+1. Criar uma turma futura com vagas e fazer o pedido com a conta do aluno.
+2. No PowerShell, dentro de D:\Projetos\PIM4API, executar:
+   powershell -ExecutionPolicy Bypass -File .\scripts\Confirm-LocalPayment.ps1 -OrderId NUMERO_DO_PEDIDO
+3. Usar um pedido ainda pending, antes de expirar a reserva (30 minutos).
+4. Atualizar http://localhost:4200/conta e abrir a matricula criada.
+
+Para verificar apenas a assinatura, sem aprovar pedido:
+powershell -ExecutionPolicy Bypass -File .\scripts\Confirm-LocalPayment.ps1 -ValidateOnly
+
+Resultado esperado: assinatura invalida HTTP 401; assinatura correta com
+pedido inexistente HTTP 404. Confirmacoes reais do Asaas terao integracao
+propria; nao presumir que usam o mesmo contrato deste webhook interno.
+
+## Revisao de pagamentos em 08/10/2026
+
+- Corrigidas transicoes de webhook: eventos diferentes nao regridem pedido
+  pago, e recusa/cancelamento nao liberam a mesma reserva repetidamente.
+- Aprovacao depois do encerramento da reserva exige conciliacao com o
+  provedor; nao cria matricula sem vaga reservada.
+- Reembolso antes da confirmacao e evento reutilizado em outro pedido sao
+  rejeitados. Validacao de concorrencia entre processos ainda e necessaria.
+- 67 testes backend aprovados em Release apos as correcoes.
+- Nenhum gateway real foi configurado. Asaas, parceiro da HostGator, esta
+  sendo avaliado; faltam confirmacao da conta/provedor e credenciais locais.
+- Render: blueprint de demonstracao e configuracao PostgreSQL adicionados;
+  publicacao, validacao online e configuracao do frontend ainda pendentes.
+
+## Retomada em 08/10/2026 - Remocao de Products concluida
+
+Este registro substitui as orientacoes antigas de manter Product para novos
+pedidos. Os caminhos atuais sao D:\Projetos\PIM4API,
+D:\Projetos\PIM4Front e D:\Projetos\PIM4Desktop.
+
+- A tabela Products foi excluida do PostgreSQL local pela migration
+  20261008160715_RemoveProducts; a entidade e seu DbSet foram removidos.
+- Courses nao possui mais LegacyProductId e novos cursos nao geram produtos.
+- CourseClasses possui CourseId obrigatorio, com exclusao Restrict, e nao
+  possui mais ProdutoId nem relacao com Products.
+- Checkout, reserva de vagas e criacao de matriculas agora usam CourseId.
+- OrderItems nao possui mais ProdutoId; nomes, tipos e valores dos itens
+  historicos foram preservados em NameSnapshot, ItemType e PrecoUnitario.
+- Itens antigos de equipamentos podem permanecer no historico com CourseId
+  nulo. Novos pedidos aceitam somente cursos existentes e ativos.
+- A migration remapeia Students.CourseId pelos IDs reais de Courses e
+  preenche Enrollment.CourseId a partir da turma quando necessario.
+- O Angular usa Course no carrinho e envia courseId no checkout. Carrinhos
+  do formato antigo precisam ser montados novamente para evitar confusao
+  entre IDs de produtos e de cursos.
+- 54 testes backend e 39 testes frontend aprovados; builds host e Docker
+  aprovados. Permanecem os avisos conhecidos de budget SCSS.
+- A migration foi validada num clone do PostgreSQL com pedidos historicos de
+  cursos/equipamentos, IDs diferentes entre Product e Course e matriculas.
+- Backup anterior a exclusao salvo em .local-backups/ (ignorado no Git).
+  RemoveProducts nao possui rollback automatico: restaurar o backup e a
+  versao anterior da aplicacao caso seja necessario retornar.
+- Banco local: 4 cursos preservados, 0 pedidos e 0 turmas no momento da
+  aplicacao. API, frontend e proxy /api responderam HTTP 200.
+- Limites dos containers aplicados e configuraveis pelo .env:
+  PostgreSQL 2 CPUs/1024 MB; API 2 CPUs/1024 MB; frontend 0,5 CPU/256 MB.
+  Esses limites valem para execucao, nao para build das imagens.
+- Temporarios .tmp-pim4-ef e .tmp-pim4-migration.sql removidos do frontend.
+- Pagamento real continua pendente da escolha/configuracao do gateway.
+- PIM4Mobile ainda possui apenas documentacao; nenhum app Flutter foi
+  implementado. Desktop WPF existente segue em preparacao para distribuicao.
+
 ## Objetivo do projeto
 
 O projeto e uma plataforma de cursos presenciais com tres experiencias
@@ -1205,15 +1304,41 @@ Fortalecer autenticacao, autorizacao e protecao dos dados de alunos e pedidos.
 
 - O frontend Angular sera responsivo para a experiencia publica e para a area
   do aluno, funcionando em desktop e navegador mobile.
-- O painel administrativo sera uma area protegida do mesmo frontend, otimizada
-  para desktop e sem necessidade de um aplicativo desktop separado nesta
-  etapa.
+- O painel administrativo existente no Angular sera mantido durante a
+  transicao, mas a versao desktop dedicada sera desenvolvida em C# com WPF e
+  .NET 10.
 - O aplicativo Flutter sera focado no aluno: aulas EAD, progresso, avaliacoes,
   certificados e informacoes de cursos presenciais.
 - Angular e Flutter consumirao a mesma API, sem duplicar regras de compra,
   matricula, permissao ou certificado no cliente.
 - A API continuara sendo a autoridade: o aluno so acessa um curso quando
   possuir uma `Enrollment` ativa vinculada ao seu `UserId`.
+
+### Aplicativo desktop administrativo
+
+O projeto inicial foi criado em `E:\Projetos\PIM4Desktop` como uma aplicacao
+WPF independente chamada `PIM4AdminDesktop`.
+
+- consome a mesma API REST usada pelo Angular e pelo futuro aplicativo Flutter;
+- usa `http://localhost:5278` somente no desenvolvimento e aceita a URL de
+  producao HTTPS pelo `appsettings.json` ou pela variavel
+  `PIM4_API_BASE_URL`;
+- realiza login pela API e permite acesso somente quando a role retornada e
+  `Admin`;
+- envia JWT nos endpoints protegidos e tenta renovar a sessao uma vez quando o
+  access token expira;
+- possui dashboard inicial e consultas administrativas de cursos, pedidos e
+  alunos;
+- nao acessa o PostgreSQL diretamente e nao armazena senha nem segredo da API;
+- build Release validado com .NET 10, sem erros ou avisos.
+
+Proximos incrementos do desktop:
+
+- formularios de criacao e edicao de cursos, turmas e cupons;
+- gerenciamento do conteudo EAD, pedidos e matriculas;
+- armazenamento protegido da sessao no Windows, se for necessario manter o
+  login ao fechar o aplicativo;
+- empacotamento e instalador para Windows.
 
 ### Implementacao em andamento
 

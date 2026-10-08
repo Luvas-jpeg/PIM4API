@@ -27,10 +27,9 @@ public class CourseService
                     .ThenInclude(question => question.Options)
             .AsNoTracking();
 
+        query = query.Where(course => course.DeliveryMode != "ead");
         if (!includeInactive)
-        {
             query = query.Where(course => course.IsActive);
-        }
 
         return (await query.OrderBy(course => course.Nome).ToListAsync())
             .Select(course => ToResponse(course, includeContent: true))
@@ -41,22 +40,26 @@ public class CourseService
     {
         var page = Math.Max(1, request.Page);
         var pageSize = Math.Clamp(request.PageSize, 1, 50);
+        // Inscricoes encerram no horario de inicio, inclusive para turmas de hoje.
+
         var today = DateTime.UtcNow;
-        var classes = _context.CourseClasses
+        var upcomingClasses = _context.CourseClasses
             .Where(courseClass =>
                 courseClass.Status == "scheduled" &&
-                courseClass.DataRealizacao >= today &&
-                (!request.AvailableOnly || courseClass.AvailableSeats > 0));
+                courseClass.DataRealizacao >= today);
 
         if (!string.IsNullOrWhiteSpace(request.City))
-            classes = classes.Where(courseClass => courseClass.Local.Contains(request.City));
+            upcomingClasses = upcomingClasses.Where(courseClass => courseClass.Local.Contains(request.City));
         if (request.StartDate.HasValue)
-            classes = classes.Where(courseClass => courseClass.DataRealizacao >= request.StartDate.Value);
+            upcomingClasses = upcomingClasses.Where(courseClass => courseClass.DataRealizacao >= request.StartDate.Value);
         if (request.EndDate.HasValue)
-            classes = classes.Where(courseClass => courseClass.DataRealizacao <= request.EndDate.Value);
+            upcomingClasses = upcomingClasses.Where(courseClass => courseClass.DataRealizacao <= request.EndDate.Value);
+
+        var availableClasses = upcomingClasses.Where(courseClass => courseClass.AvailableSeats > 0);
 
         var query = _context.Courses
             .Where(course => course.IsActive)
+            .Where(course => course.DeliveryMode != "ead")
             .Where(course => !string.IsNullOrWhiteSpace(request.Category)
                 ? course.Category == request.Category
                 : true)
@@ -65,9 +68,9 @@ public class CourseService
             .Where(course => string.IsNullOrWhiteSpace(request.Search)
                 || course.Nome.Contains(request.Search)
                 || course.Description.Contains(request.Search))
-            .Where(course =>
+            .Where(course => !request.AvailableOnly ||
                 course.DeliveryMode == "ead" ||
-                course.Classes.Any(courseClass => classes.Any(item => item.Id == courseClass.Id)))
+                course.Classes.Any(courseClass => availableClasses.Any(item => item.Id == courseClass.Id)))
             .Include(course => course.Classes)
             .Include(course => course.Modules)
                 .ThenInclude(module => module.Lessons)
@@ -87,9 +90,12 @@ public class CourseService
                     course.Nome.ToLower() == request.Search!.Trim().ToLower() ? 3 :
                     course.Nome.ToLower().StartsWith(request.Search.Trim().ToLower()) ? 2 : 1)
                     .ThenBy(course => course.Nome),
-            _ => query.OrderBy(course => course.DeliveryMode == "ead")
+            _ => query.OrderByDescending(course => course.DeliveryMode == "presencial" &&
+                    course.Classes.Any(courseClass => upcomingClasses.Any(item => item.Id == courseClass.Id)))
+                .ThenByDescending(course => course.DeliveryMode == "ead" ||
+                    course.Classes.Any(courseClass => availableClasses.Any(item => item.Id == courseClass.Id)))
                 .ThenBy(course => course.Classes
-                    .Where(courseClass => classes.Any(item => item.Id == courseClass.Id))
+                    .Where(courseClass => upcomingClasses.Any(item => item.Id == courseClass.Id))
                     .Min(courseClass => (DateTime?)courseClass.DataRealizacao))
                 .ThenBy(course => course.Nome)
         };
@@ -102,7 +108,7 @@ public class CourseService
 
         foreach (var course in items)
             course.Classes = course.Classes
-                .Where(courseClass => classes.Any(item => item.Id == courseClass.Id))
+                .Where(courseClass => upcomingClasses.Any(item => item.Id == courseClass.Id))
                 .OrderBy(courseClass => courseClass.DataRealizacao)
                 .ToList();
 
@@ -164,9 +170,42 @@ public class CourseService
                 .ThenInclude(assessment => assessment.Questions)
                     .ThenInclude(question => question.Options)
             .AsNoTracking()
-            .FirstOrDefaultAsync(item => item.Id == id && item.IsActive);
+            .FirstOrDefaultAsync(item => item.Id == id && item.IsActive && item.DeliveryMode != "ead");
 
         return course == null ? null : ToResponse(course, includeContent: false);
+    }
+
+    public async Task<ServiceResult<CourseInterestResponseDTO>> RegisterInterestAsync(
+        int courseId,
+        CourseInterestRequestDTO request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name) || string.IsNullOrWhiteSpace(request.Email))
+            return ServiceResult<CourseInterestResponseDTO>.Fail("Nome e e-mail sao obrigatorios.");
+
+        var email = request.Email.Trim().ToLowerInvariant();
+        if (!System.Net.Mail.MailAddress.TryCreate(email, out _))
+            return ServiceResult<CourseInterestResponseDTO>.Fail("Informe um e-mail valido.");
+
+        var courseExists = await _context.Courses.AnyAsync(course => course.Id == courseId && course.IsActive);
+        if (!courseExists)
+            return ServiceResult<CourseInterestResponseDTO>.Fail("Curso nao encontrado.");
+
+        var existing = await _context.CourseInterests
+            .FirstOrDefaultAsync(interest => interest.CourseId == courseId && interest.Email == email);
+        if (existing != null)
+            return ServiceResult<CourseInterestResponseDTO>.Ok(ToInterestResponse(existing));
+
+        var interest = new CourseInterest
+        {
+            CourseId = courseId,
+            Name = request.Name.Trim(),
+            Email = email,
+            Phone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim(),
+            CreatedAt = DateTime.UtcNow
+        };
+        _context.CourseInterests.Add(interest);
+        await _context.SaveChangesAsync();
+        return ServiceResult<CourseInterestResponseDTO>.Ok(ToInterestResponse(interest));
     }
 
     public async Task<ServiceResult<CourseResponseDTO>> CreateAsync(CourseRequestDTO request, int? userId = null)
@@ -179,7 +218,6 @@ public class CourseService
 
         var course = new Course();
         Apply(course, request);
-        SyncLegacyProduct(course);
         _context.Courses.Add(course);
         _auditService.Add(userId, "created", "Course", course.Id, null, new { request.Nome, request.Preco });
         await _context.SaveChangesAsync();
@@ -195,7 +233,6 @@ public class CourseService
         }
 
         var course = await _context.Courses
-            .Include(item => item.LegacyProduct)
             .Include(item => item.Classes)
             .Include(item => item.Modules)
                 .ThenInclude(module => module.Lessons)
@@ -211,7 +248,6 @@ public class CourseService
 
         var previous = new { course.Nome, course.Preco, course.Category, course.IsActive };
         Apply(course, request);
-        SyncLegacyProduct(course);
         _auditService.Add(userId, "updated", "Course", course.Id, previous,
             new { course.Nome, course.Preco, course.Category, course.IsActive });
         await _context.SaveChangesAsync();
@@ -759,9 +795,8 @@ public class CourseService
         var courseClass = new CourseClass
         {
             CourseId = courseId,
-            ProdutoId = course.LegacyProductId,
-            DataRealizacao = request.StartDate,
-            EndDate = request.EndDate,
+            DataRealizacao = ToUtc(request.StartDate),
+            EndDate = request.EndDate.HasValue ? ToUtc(request.EndDate.Value) : null,
             Local = request.Local.Trim(),
             Instructor = request.Instructor.Trim(),
             Capacity = request.Capacity,
@@ -812,8 +847,8 @@ public class CourseService
             courseClass.Capacity,
             courseClass.Status
         };
-        courseClass.DataRealizacao = request.StartDate;
-        courseClass.EndDate = request.EndDate;
+        courseClass.DataRealizacao = ToUtc(request.StartDate);
+        courseClass.EndDate = request.EndDate.HasValue ? ToUtc(request.EndDate.Value) : null;
         courseClass.Local = request.Local.Trim();
         courseClass.Instructor = request.Instructor.Trim();
         courseClass.Capacity = request.Capacity;
@@ -841,8 +876,8 @@ public class CourseService
             return "Nome e obrigatorio.";
         if (request.Preco < 0)
             return "Preco nao pode ser negativo.";
-        if (NormalizeDeliveryMode(request.DeliveryMode) is not ("presencial" or "ead"))
-            return "Tipo do curso deve ser 'presencial' ou 'ead'.";
+        if (NormalizeDeliveryMode(request.DeliveryMode) != "presencial")
+            return "Cursos EAD estao temporariamente desativados.";
         if (request.WorkloadHours < 0)
             return "Carga horaria nao pode ser negativa.";
         return null;
@@ -955,23 +990,6 @@ public class CourseService
             .ToList();
     }
 
-    private static void SyncLegacyProduct(Course course)
-    {
-        course.LegacyProduct ??= new Product
-        {
-            TipoProduto = "course",
-            Estoque = 0
-        };
-
-        course.LegacyProduct.Nome = course.Nome;
-        course.LegacyProduct.Preco = course.Preco;
-        course.LegacyProduct.TipoProduto = "course";
-        course.LegacyProduct.Description = course.Description;
-        course.LegacyProduct.Image = course.Image;
-        course.LegacyProduct.Category = course.Category;
-        course.LegacyProduct.Estoque ??= 0;
-    }
-
     private static CourseResponseDTO ToResponse(Course course, bool includeContent = true)
     {
         return new CourseResponseDTO
@@ -985,7 +1003,6 @@ public class CourseService
             DeliveryMode = course.DeliveryMode,
             WorkloadHours = course.WorkloadHours,
             IsActive = course.IsActive,
-            LegacyProductId = course.LegacyProductId,
             ModuleCount = course.Modules.Count(item => item.IsActive),
             LessonCount = course.Modules
                 .Where(item => item.IsActive)
@@ -1018,7 +1035,7 @@ public class CourseService
         return new CourseClassResponseDTO
         {
             Id = courseClass.Id,
-            CourseId = courseClass.CourseId ?? 0,
+            CourseId = courseClass.CourseId,
             StartDate = courseClass.DataRealizacao,
             EndDate = courseClass.EndDate,
             Local = courseClass.Local,
@@ -1043,6 +1060,15 @@ public class CourseService
             Status = enrollment.Status
         });
     }
+
+    private static CourseInterestResponseDTO ToInterestResponse(CourseInterest interest)
+        => new()
+        {
+            Id = interest.Id,
+            CourseId = interest.CourseId,
+            Status = interest.Status,
+            CreatedAt = interest.CreatedAt
+        };
 
     private static CourseModuleResponseDTO ToModuleResponse(CourseModule module)
     {
@@ -1124,4 +1150,12 @@ public class CourseService
         => string.IsNullOrWhiteSpace(value)
             ? "presencial"
             : value.Trim().ToLowerInvariant();
+
+    private static DateTime ToUtc(DateTime value)
+        => value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Local).ToUniversalTime()
+        };
 }

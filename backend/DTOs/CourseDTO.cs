@@ -11,7 +11,6 @@ public class CourseResponseDTO
     public string DeliveryMode { get; set; } = "presencial";
     public int WorkloadHours { get; set; }
     public bool IsActive { get; set; }
-    public int? LegacyProductId { get; set; }
     public int ModuleCount { get; set; }
     public int LessonCount { get; set; }
     public List<CourseClassResponseDTO> Classes { get; set; } = new();
@@ -171,7 +170,7 @@ public class CourseCatalogQueryDTO
     public string? City { get; set; }
     public DateTime? StartDate { get; set; }
     public DateTime? EndDate { get; set; }
-    public bool AvailableOnly { get; set; } = true;
+    public bool AvailableOnly { get; set; }
     public string Sort { get; set; } = "date";
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 9;

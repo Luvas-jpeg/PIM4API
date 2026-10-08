@@ -1,7 +1,7 @@
 namespace EquipamentosMedicosApi.Models;
 
 /// <summary>
-/// Course catalog entity. Product remains as a legacy catalog item during migration.
+/// Course catalog entity shared by all clients.
 /// </summary>
 public class Course
 {
@@ -14,9 +14,7 @@ public class Course
     public string DeliveryMode { get; set; } = "presencial";
     public int WorkloadHours { get; set; }
     public bool IsActive { get; set; } = true;
-    public int? LegacyProductId { get; set; }
 
-    public Product? LegacyProduct { get; set; }
     public ICollection<CourseClass> Classes { get; set; } = new List<CourseClass>();
     public ICollection<CourseModule> Modules { get; set; } = new List<CourseModule>();
     public ICollection<CourseAssessment> Assessments { get; set; } = new List<CourseAssessment>();

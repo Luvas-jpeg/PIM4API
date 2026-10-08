@@ -2,6 +2,8 @@ services:
   postgres:
     image: postgres:17-alpine
     container_name: medishop-postgres
+    cpus: ${POSTGRES_CPUS:-2.0}
+    mem_limit: ${POSTGRES_MEMORY_LIMIT:-1024m}
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-medishop}
       POSTGRES_USER: ${POSTGRES_USER:-medishop}
@@ -22,6 +24,8 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     container_name: medishop-api
+    cpus: ${API_CPUS:-2.0}
+    mem_limit: ${API_MEMORY_LIMIT:-1024m}
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,6 +43,8 @@ services:
       context: ../PIM4Front
       dockerfile: Dockerfile
     container_name: medishop-frontend
+    cpus: ${FRONTEND_CPUS:-0.5}
+    mem_limit: ${FRONTEND_MEMORY_LIMIT:-256m}
     depends_on:
       - api
     ports:

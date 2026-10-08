@@ -3,8 +3,7 @@ namespace EquipamentosMedicosApi.Models;
 public class CourseClass
 {
     public int Id { get; set; }
-    public int? CourseId { get; set; }
-    public int? ProdutoId { get; set; }
+    public int CourseId { get; set; }
     public DateTime DataRealizacao { get; set; }
     public DateTime? EndDate { get; set; }
     public string Local { get; set; } = string.Empty;
@@ -15,7 +14,6 @@ public class CourseClass
     public string Status { get; set; } = "scheduled";
 
     public Course? Course { get; set; }
-    public Product? Produto { get; set; }
     public ICollection<Enrollment> Enrollments { get; set; } = new List<Enrollment>();
 
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]

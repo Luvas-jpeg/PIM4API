@@ -69,6 +69,19 @@ public class CoursesController : ControllerBase
     public async Task<IActionResult> Restore(int id)
         => await SetActive(id, true);
 
+    [HttpPost("{id:int}/interests")]
+    [AllowAnonymous]
+    public async Task<IActionResult> RegisterInterest(int id, CourseInterestRequestDTO request)
+    {
+        var result = await _courseService.RegisterInterestAsync(id, request);
+        if (!result.Success)
+            return result.Error?.Contains("nao encontrado", StringComparison.OrdinalIgnoreCase) == true
+                ? NotFound(new { message = result.Error })
+                : BadRequest(new { message = result.Error });
+
+        return Ok(result.Data);
+    }
+
     [HttpGet("{courseId:int}/classes")]
     public async Task<IActionResult> GetClasses(int courseId, [FromQuery] bool includeInactive = false)
         => Ok(await _courseService.GetClassesAsync(courseId, includeInactive));

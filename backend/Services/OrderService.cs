@@ -85,12 +85,12 @@ public class OrderService
             return ServiceResult<CreateOrderResponse>.Fail(inventoryResult.Error ?? "Erro ao validar estoque.");
         }
 
-        var products = inventoryResult.Data;
+        var courses = inventoryResult.Data;
 
         var subtotal = request.Itens.Sum(item =>
         {
-            var product = products[item.ProdutoId];
-            return product.Preco * item.Quantidade;
+            var course = courses[item.CourseId];
+            return course.Preco * item.Quantidade;
         });
 
         var discountResult = await _promoCodeService.ApplyDiscountAsync(request.PromoCode, subtotal);
@@ -115,14 +115,16 @@ public class OrderService
             PromoCode = request.PromoCode.Trim().ToUpper(),
             Itens = request.Itens.Select(item =>
             {
-                var product = products[item.ProdutoId];
+                var course = courses[item.CourseId];
 
                 return new OrderItem
                 {
-                    ProdutoId = item.ProdutoId,
+                    CourseId = item.CourseId,
+                    NameSnapshot = course.Nome,
+                    ItemType = "course",
                     TurmaId = item.TurmaId,
                     Quantidade = item.Quantidade,
-                    PrecoUnitario = product.Preco
+                    PrecoUnitario = course.Preco
                 };
             }).ToList()
         };
@@ -156,14 +158,14 @@ public class OrderService
         var orders = await _context.Orders
             .Where(o => o.UsuarioId == userId)
             .Include(o => o.Itens)
-                .ThenInclude(i => i.Produto)
+                .ThenInclude(i => i.Course)
             .OrderByDescending(o => o.DataPedido)
             .ToListAsync();
 
         var courseIds = orders
             .SelectMany(order => order.Itens)
-            .Where(item => item.Produto?.TipoProduto == "course")
-            .Select(item => item.ProdutoId.ToString())
+            .Where(item => item.CourseId.HasValue)
+            .Select(item => item.CourseId!.Value.ToString())
             .Distinct()
             .ToList();
 
@@ -186,14 +188,14 @@ public class OrderService
             PromoCode = order.PromoCode,
             Itens = order.Itens.Select(item => new OrderItemResponse
             {
-                ProdutoId = item.ProdutoId,
+                CourseId = item.CourseId,
                 TurmaId = item.TurmaId,
-                Nome = item.Produto?.Nome ?? string.Empty,
-                TipoProduto = item.Produto?.TipoProduto ?? "equipment",
+                Nome = item.NameSnapshot,
+                ItemType = item.ItemType,
                 Quantidade = item.Quantidade,
                 PrecoUnitario = item.PrecoUnitario,
-                Status = item.Produto?.TipoProduto == "course"
-                    && studentStatuses.TryGetValue(item.ProdutoId.ToString(), out var status)
+                Status = item.CourseId.HasValue
+                    && studentStatuses.TryGetValue(item.CourseId!.Value.ToString(), out var status)
                         ? status
                         : null
             }).ToList()
@@ -207,7 +209,7 @@ public class OrderService
         var query = _context.Orders
             .Include(order => order.Usuario)
             .Include(order => order.Itens)
-                .ThenInclude(item => item.Produto)
+                .ThenInclude(item => item.Course)
             .Where(order => order.Id == orderId);
 
         if (!isAdmin)
@@ -278,7 +280,7 @@ public class OrderService
 
         var order = await _context.Orders
             .Include(item => item.Itens)
-                .ThenInclude(item => item.Produto)
+                .ThenInclude(item => item.Course)
             .Include(item => item.Itens)
                 .ThenInclude(item => item.Turma)
             .Include(item => item.Usuario)
@@ -341,15 +343,19 @@ public class OrderService
                 .ThenInclude(order => order!.Usuario)
             .Include(webhookEvent => webhookEvent.Order)
                 .ThenInclude(order => order!.Itens)
-                    .ThenInclude(item => item.Produto)
+                    .ThenInclude(item => item.Course)
             .FirstOrDefaultAsync(webhookEvent => webhookEvent.EventId == eventId);
 
         if (existingEvent?.Order != null)
+        {
+            if (existingEvent.OrderId != orderId)
+                return ServiceResult<OrderResponse>.Fail("Evento pertence a outro pedido.");
             return ServiceResult<OrderResponse>.Ok(ToResponse(existingEvent.Order));
+        }
 
         var order = await _context.Orders
             .Include(item => item.Itens)
-                .ThenInclude(item => item.Produto)
+                .ThenInclude(item => item.Course)
             .Include(item => item.Itens)
                 .ThenInclude(item => item.Turma)
             .Include(item => item.Usuario)
@@ -362,6 +368,13 @@ public class OrderService
         if (normalizedStatus is not ("paid" or "refused" or "cancelled" or "refunded"))
             return ServiceResult<OrderResponse>.Fail("Status de pagamento invalido.");
 
+        // Aprovacao tardia exige conciliacao; a reserva ja foi liberada.
+        if (normalizedStatus == "paid" && order.PaymentStatus is "cancelled" or "refused" or "refunded")
+            return ServiceResult<OrderResponse>.Fail(
+                "Pagamento recebido apos encerramento do pedido. Necessaria conciliacao com o provedor.");
+        if (normalizedStatus == "refunded" && order.PaymentStatus is not ("paid" or "refunded"))
+            return ServiceResult<OrderResponse>.Fail("Somente pedidos pagos podem ser reembolsados.");
+
         var webhookEvent = new PaymentWebhookEvent
         {
             EventId = eventId,
@@ -372,52 +385,40 @@ public class OrderService
         };
         _context.PaymentWebhookEvents.Add(webhookEvent);
 
-        var alreadyPaidWithoutRefund = order.PaymentStatus == "paid" && normalizedStatus != "refunded";
-
-        if (!string.IsNullOrWhiteSpace(paymentId))
-            order.GatewayPaymentId = paymentId;
-
-        if (normalizedStatus == "paid" && !alreadyPaidWithoutRefund)
+        if (order.PaymentStatus == "pending")
         {
-            if (order.PaymentStatus != "paid")
+            if (!string.IsNullOrWhiteSpace(paymentId))
+                order.GatewayPaymentId = paymentId;
+            order.PaymentStatus = normalizedStatus;
+            if (normalizedStatus == "paid")
             {
-                order.PaymentStatus = "paid";
                 order.Status = "processing";
                 order.PaidAt = DateTime.UtcNow;
-
                 foreach (var item in order.Itens)
                 {
-                    if (item.Produto != null)
-                    {
+                    if (item.Course != null)
                         await _enrollmentService.CreateEnrollmentsForCourseAsync(
-                            order.Usuario!,
-                            item.Produto,
-                            order,
-                            item.Quantidade,
-                            item.TurmaId);
-                    }
+                            order.Usuario!, item.Course, order, item.Quantidade, item.TurmaId);
                 }
             }
-        }
-        else
-        {
-            if (order.PaymentStatus != normalizedStatus &&
-                (order.PaymentStatus != "paid" || normalizedStatus == "refunded"))
-                await ReleaseStockAsync(order);
-
-            if (normalizedStatus == "refunded")
+            else
             {
-                var enrollments = await _context.Enrollments
-                    .Where(enrollment => enrollment.OrderId == order.Id)
-                    .ToListAsync();
-
-                foreach (var enrollment in enrollments)
-                    enrollment.Status = "cancelled";
+                await ReleaseStockAsync(order);
+                order.Status = "cancelled";
             }
-
-            order.PaymentStatus = normalizedStatus;
+        }
+        else if (order.PaymentStatus == "paid" && normalizedStatus == "refunded")
+        {
+            await ReleaseStockAsync(order);
+            var enrollments = await _context.Enrollments
+                .Where(enrollment => enrollment.OrderId == order.Id).ToListAsync();
+            foreach (var enrollment in enrollments)
+                enrollment.Status = "cancelled";
+            order.PaymentStatus = "refunded";
             order.Status = "cancelled";
         }
+        // Eventos repetidos ou atrasados sao registrados sem regredir o
+        // pagamento nem liberar a mesma reserva novamente.
 
         webhookEvent.ProcessedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
@@ -428,42 +429,23 @@ public class OrderService
 
     private async Task ReleaseStockAsync(Order order)
     {
-        var productIds = order.Itens.Select(item => item.ProdutoId).Distinct().ToList();
-        var products = await _context.Products
-            .Where(product => productIds.Contains(product.Id))
-            .ToDictionaryAsync(product => product.Id);
-        var eadProductIds = await _context.Courses
-            .Where(course =>
-                course.LegacyProductId.HasValue &&
-                productIds.Contains(course.LegacyProductId.Value) &&
-                course.DeliveryMode == "ead")
-            .Select(course => course.LegacyProductId!.Value)
-            .ToListAsync();
-
-        foreach (var item in order.Itens)
+        foreach (var item in order.Itens.Where(item => item.TurmaId.HasValue))
         {
-            if (item.TurmaId.HasValue)
-            {
-                var courseClass = await _context.CourseClasses
-                    .FirstOrDefaultAsync(courseClass => courseClass.Id == item.TurmaId.Value);
-                if (courseClass != null)
-                {
-                    courseClass.AvailableSeats += item.Quantidade;
-                    courseClass.VafasDisponiveis = courseClass.AvailableSeats;
-                }
-            }
-            else if (!eadProductIds.Contains(item.ProdutoId) &&
-                products.TryGetValue(item.ProdutoId, out var product))
-                product.Estoque = (product.Estoque ?? 0) + item.Quantidade;
+            await _context.CourseClasses
+                .Where(courseClass => courseClass.Id == item.TurmaId!.Value)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(courseClass => courseClass.AvailableSeats,
+                        courseClass => courseClass.AvailableSeats + item.Quantidade)
+                    .SetProperty(courseClass => courseClass.VafasDisponiveis,
+                        courseClass => courseClass.VafasDisponiveis + item.Quantidade));
         }
     }
-
     public async Task<List<OrderResponse>> GetAllAsync()
     {
         var orders = await _context.Orders
             .Include(o => o.Usuario)
             .Include(o => o.Itens)
-                .ThenInclude(i => i.Produto)
+                .ThenInclude(i => i.Course)
             .OrderByDescending(o => o.DataPedido)
             .ToListAsync();
 
@@ -488,10 +470,10 @@ public class OrderService
             },
             Itens = order.Itens.Select(item => new OrderItemResponse
             {
-                ProdutoId = item.ProdutoId,
+                CourseId = item.CourseId,
                 TurmaId = item.TurmaId,
-                Nome = item.Produto?.Nome ?? string.Empty,
-                TipoProduto = item.Produto?.TipoProduto ?? "equipment",
+                Nome = item.NameSnapshot,
+                ItemType = item.ItemType,
                 Quantidade = item.Quantidade,
                 PrecoUnitario = item.PrecoUnitario
             }).ToList()
@@ -550,10 +532,10 @@ public class OrderService
             },
             Itens = order.Itens.Select(item => new OrderItemResponse
             {
-                ProdutoId = item.ProdutoId,
+                CourseId = item.CourseId,
                 TurmaId = item.TurmaId,
-                Nome = item.Produto?.Nome ?? string.Empty,
-                TipoProduto = item.Produto?.TipoProduto ?? "equipment",
+                Nome = item.NameSnapshot,
+                ItemType = item.ItemType,
                 Quantidade = item.Quantidade,
                 PrecoUnitario = item.PrecoUnitario
             }).ToList()

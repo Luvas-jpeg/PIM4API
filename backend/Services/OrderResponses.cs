@@ -35,12 +35,12 @@ public class OrderUserResponse
 }
 public class OrderItemResponse
 {
-    public int ProdutoId { get; set; }
+    public int? CourseId { get; set; }
     public int? TurmaId { get; set; }
 
     public string Nome { get; set; } = string.Empty;
 
-    public string TipoProduto { get; set; } = string.Empty;
+    public string ItemType { get; set; } = string.Empty;
 
     public int Quantidade { get; set; }
 

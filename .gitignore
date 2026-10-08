@@ -51,3 +51,5 @@ Thumbs.db
 
 # Docker local override
 docker-compose.override.yml
+# Local database backups
+.local-backups/

@@ -11,12 +11,7 @@ using EquipamentosMedicosApi.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 // --- Banco de Dados ---
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-if (string.IsNullOrWhiteSpace(connectionString))
-{
-    throw new InvalidOperationException(
-        "ConnectionStrings:DefaultConnection não foi configurada. Configure via appsettings.Development.json, user-secrets ou variável ConnectionStrings__DefaultConnection.");
-}
+var connectionString = DatabaseConfiguration.GetConnectionString(builder.Configuration);
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
@@ -168,8 +163,8 @@ builder.Services.AddHostedService<PendingOrderExpirationService>();
 
 var app = builder.Build();
 
-// --- Aplicar migrations automaticamente apenas em desenvolvimento ---
-if (app.Environment.IsDevelopment())
+// --- Desenvolvimento local ou demonstracao explicitamente habilitada ---
+if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Database:ApplyMigrationsOnStartup"))
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -185,7 +180,10 @@ if (app.Environment.IsDevelopment())
 if (!app.Environment.IsDevelopment())
 {
     app.UseHsts();
-    app.UseHttpsRedirection();
+    if (app.Configuration.GetValue<bool?>("Https:RedirectEnabled") ?? true)
+    {
+        app.UseHttpsRedirection();
+    }
 }
 
 app.UseCors("AllowFrontend");
@@ -193,5 +191,10 @@ app.UseAuthentication();
 app.UseRateLimiter();
 app.UseAuthorization();
 app.MapControllers();
+app.MapGet("/health", async (AppDbContext db, CancellationToken cancellationToken) =>
+{
+    var ready = await db.Database.CanConnectAsync(cancellationToken);
+    return ready ? Results.Ok(new { status = "healthy" }) : Results.StatusCode(503);
+}).AllowAnonymous();
 
 app.Run();

@@ -11,7 +11,36 @@ namespace backend.Tests;
 public sealed class CourseDomainTests
 {
     [Fact]
-    public async Task CreatedCoursesKeepLegacyProductForCheckoutCompatibility()
+    public async Task CatalogDoesNotAdvertiseSeatsAfterAClassHasStarted()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var pastCourse = new Course { Nome = "Turma iniciada", Preco = 100m, IsActive = true };
+        var futureCourse = new Course { Nome = "Turma futura", Preco = 100m, IsActive = true };
+        fixture.Context.Courses.AddRange(pastCourse, futureCourse);
+        await fixture.Context.SaveChangesAsync();
+        fixture.Context.CourseClasses.AddRange(
+            new CourseClass {
+                CourseId = pastCourse.Id, DataRealizacao = DateTime.UtcNow.AddSeconds(-1),
+                Status = "scheduled", Capacity = 30, AvailableSeats = 30, VafasDisponiveis = 30,
+                Local = "Sao Paulo"
+            },
+            new CourseClass {
+                CourseId = futureCourse.Id, DataRealizacao = DateTime.UtcNow.AddHours(2),
+                Status = "scheduled", Capacity = 30, AvailableSeats = 30, VafasDisponiveis = 30,
+                Local = "Sao Paulo"
+            });
+        await fixture.Context.SaveChangesAsync();
+        var service = new CourseService(fixture.Context);
+        var catalog = await service.GetCatalogAsync(new CourseCatalogQueryDTO());
+        Assert.Empty(catalog.Items.Single(c => c.Id == pastCourse.Id).Classes);
+        Assert.Single(catalog.Items.Single(c => c.Id == futureCourse.Id).Classes);
+        var available = await service.GetCatalogAsync(new CourseCatalogQueryDTO { AvailableOnly = true });
+        Assert.DoesNotContain(available.Items, c => c.Id == pastCourse.Id);
+        Assert.Contains(available.Items, c => c.Id == futureCourse.Id);
+    }
+
+    [Fact]
+    public async Task CreatedClassesReferenceCoursesWithoutALegacyProductRelation()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var service = new CourseService(fixture.Context);
@@ -39,14 +68,14 @@ public sealed class CourseDomainTests
 
         Assert.True(classResult.Success);
         Assert.Equal(courseId, classResult.Data!.CourseId);
-        Assert.NotNull(await fixture.Context.Courses
-            .Where(course => course.Id == courseId)
-            .Select(course => course.LegacyProductId)
-            .SingleAsync());
-        Assert.Equal(courseResult.Data.LegacyProductId, await fixture.Context.CourseClasses
+        Assert.Equal(courseId, await fixture.Context.CourseClasses
             .Where(courseClass => courseClass.Id == classResult.Data.Id)
-            .Select(courseClass => courseClass.ProdutoId)
+            .Select(courseClass => courseClass.CourseId)
             .SingleAsync());
+        var classModel = fixture.Context.Model.FindEntityType(typeof(CourseClass))!;
+        Assert.Null(classModel.FindProperty("ProdutoId"));
+        Assert.DoesNotContain(classModel.GetForeignKeys(),
+            relation => relation.PrincipalEntityType.ClrType.Name == "Product");
     }
 
     [Fact]
@@ -126,23 +155,14 @@ public sealed class CourseDomainTests
     public async Task CoursePurchaseReservesSeatsFromTheSelectedClass()
     {
         await using var fixture = await TestFixture.CreateAsync();
-        var product = new Product
-        {
-            Nome = "Curso legado",
-            TipoProduto = "course",
-            Preco = 300m,
-            Estoque = 10
-        };
         var course = new Course
         {
-            Nome = product.Nome,
-            Preco = product.Preco,
-            LegacyProduct = product
+            Nome = "Curso legado",
+            Preco = 300m
         };
         var courseClass = new CourseClass
         {
             Course = course,
-            Produto = product,
             Capacity = 5,
             AvailableSeats = 5,
             VafasDisponiveis = 5,
@@ -150,13 +170,13 @@ public sealed class CourseDomainTests
             Local = "Sao Paulo",
             Instructor = "Instrutor"
         };
-        fixture.Context.AddRange(product, course, courseClass);
+        fixture.Context.AddRange(course, courseClass);
         await fixture.Context.SaveChangesAsync();
 
         var service = new InventoryService(fixture.Context);
         var result = await service.ValidateAndReserveAsync(new List<CreateOrderItemDTO>
         {
-            new() { ProdutoId = product.Id, TurmaId = courseClass.Id, Quantidade = 2 }
+            new() { CourseId = course.Id, TurmaId = courseClass.Id, Quantidade = 2 }
         });
 
         Assert.True(result.Success);
@@ -170,26 +190,18 @@ public sealed class CourseDomainTests
     public async Task CoursePurchaseMustProvideAnExplicitClass()
     {
         await using var fixture = await TestFixture.CreateAsync();
-        var product = new Product
-        {
-            Nome = "Curso sem turma",
-            TipoProduto = "course",
-            Preco = 300m,
-            Estoque = 10
-        };
         var course = new Course
         {
-            Nome = product.Nome,
-            Preco = product.Preco,
-            LegacyProduct = product
+            Nome = "Curso sem turma",
+            Preco = 300m
         };
-        fixture.Context.AddRange(product, course);
+        fixture.Context.AddRange(course);
         await fixture.Context.SaveChangesAsync();
 
         var service = new InventoryService(fixture.Context);
         var result = await service.ValidateAndReserveAsync(new List<CreateOrderItemDTO>
         {
-            new() { ProdutoId = product.Id, Quantidade = 1 }
+            new() { CourseId = course.Id, Quantidade = 1 }
         });
 
         Assert.False(result.Success);
@@ -200,69 +212,49 @@ public sealed class CourseDomainTests
     public async Task EadCoursePurchaseDoesNotRequireAClass()
     {
         await using var fixture = await TestFixture.CreateAsync();
-        var product = new Product
-        {
-            Nome = "Curso EAD",
-            TipoProduto = "course",
-            Preco = 300m,
-            Estoque = 0
-        };
         var course = new Course
         {
-            Nome = product.Nome,
-            Preco = product.Preco,
-            DeliveryMode = "ead",
-            LegacyProduct = product
+            Nome = "Curso EAD",
+            Preco = 300m,
+            DeliveryMode = "ead"
         };
-        fixture.Context.AddRange(product, course);
+        fixture.Context.AddRange(course);
         await fixture.Context.SaveChangesAsync();
 
         var result = await new InventoryService(fixture.Context).ValidateAndReserveAsync(new List<CreateOrderItemDTO>
         {
-            new() { ProdutoId = product.Id, Quantidade = 2 }
+            new() { CourseId = course.Id, Quantidade = 2 }
         });
 
         Assert.True(result.Success);
-        Assert.Equal(0, await fixture.Context.Products
-            .Where(item => item.Id == product.Id)
-            .Select(item => item.Estoque)
-            .SingleAsync());
+        Assert.Empty(await fixture.Context.CourseClasses.ToListAsync());
     }
 
     [Fact]
     public async Task EadCoursePurchaseRejectsAProvidedClass()
     {
         await using var fixture = await TestFixture.CreateAsync();
-        var product = new Product
-        {
-            Nome = "Curso EAD com turma indevida",
-            TipoProduto = "course",
-            Preco = 300m,
-            Estoque = 0
-        };
         var course = new Course
         {
-            Nome = product.Nome,
-            Preco = product.Preco,
-            DeliveryMode = "ead",
-            LegacyProduct = product
+            Nome = "Curso EAD com turma indevida",
+            Preco = 300m,
+            DeliveryMode = "ead"
         };
         var courseClass = new CourseClass
         {
             Course = course,
-            Produto = product,
             Capacity = 5,
             AvailableSeats = 5,
             VafasDisponiveis = 5,
             DataRealizacao = DateTime.UtcNow.AddDays(5),
             Status = "scheduled"
         };
-        fixture.Context.AddRange(product, course, courseClass);
+        fixture.Context.AddRange(course, courseClass);
         await fixture.Context.SaveChangesAsync();
 
         var result = await new InventoryService(fixture.Context).ValidateAndReserveAsync(new List<CreateOrderItemDTO>
         {
-            new() { ProdutoId = product.Id, TurmaId = courseClass.Id, Quantidade = 1 }
+            new() { CourseId = course.Id, TurmaId = courseClass.Id, Quantidade = 1 }
         });
 
         Assert.False(result.Success);
@@ -273,14 +265,11 @@ public sealed class CourseDomainTests
     public async Task CoursePurchaseRejectsAClassFromAnotherCourse()
     {
         await using var fixture = await TestFixture.CreateAsync();
-        var firstProduct = new Product { Nome = "Primeiro curso", TipoProduto = "course", Preco = 100m };
-        var secondProduct = new Product { Nome = "Segundo curso", TipoProduto = "course", Preco = 100m };
-        var firstCourse = new Course { Nome = firstProduct.Nome, Preco = firstProduct.Preco, LegacyProduct = firstProduct };
-        var secondCourse = new Course { Nome = secondProduct.Nome, Preco = secondProduct.Preco, LegacyProduct = secondProduct };
+        var firstCourse = new Course { Nome = "Primeiro curso", Preco = 100m };
+        var secondCourse = new Course { Nome = "Segundo curso", Preco = 100m };
         var secondClass = new CourseClass
         {
             Course = secondCourse,
-            Produto = secondProduct,
             Capacity = 5,
             AvailableSeats = 5,
             VafasDisponiveis = 5,
@@ -288,13 +277,13 @@ public sealed class CourseDomainTests
             Local = "Sao Paulo",
             Instructor = "Instrutor"
         };
-        fixture.Context.AddRange(firstProduct, secondProduct, firstCourse, secondCourse, secondClass);
+        fixture.Context.AddRange(firstCourse, secondCourse, secondClass);
         await fixture.Context.SaveChangesAsync();
 
         var service = new InventoryService(fixture.Context);
         var result = await service.ValidateAndReserveAsync(new List<CreateOrderItemDTO>
         {
-            new() { ProdutoId = firstProduct.Id, TurmaId = secondClass.Id, Quantidade = 1 }
+            new() { CourseId = firstCourse.Id, TurmaId = secondClass.Id, Quantidade = 1 }
         });
 
         Assert.False(result.Success);
@@ -353,7 +342,7 @@ public sealed class CourseDomainTests
     }
 
     [Fact]
-    public async Task PublicCourseResponsesHideEadContentAndKeepSafeCounts()
+    public async Task EadCoursesArePreservedButHiddenWhileTheFeatureIsDisabled()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var course = new Course
@@ -386,18 +375,10 @@ public sealed class CourseDomainTests
         var detail = await service.GetByIdAsync(course.Id);
         var administrative = await service.GetAllAsync(includeInactive: true);
 
-        var catalogCourse = Assert.Single(catalog.Items);
-        Assert.Empty(catalogCourse.Modules);
-        Assert.Empty(catalogCourse.Assessments);
-        Assert.Equal(1, catalogCourse.ModuleCount);
-        Assert.Equal(1, catalogCourse.LessonCount);
-        Assert.NotNull(detail);
-        Assert.Empty(detail!.Modules);
-        Assert.Empty(detail.Assessments);
-        var administrativeCourse = Assert.Single(administrative);
-        Assert.Single(administrativeCourse.Modules);
-        Assert.Single(administrativeCourse.Assessments);
-        Assert.Equal("https://video.example/private", administrativeCourse.Modules[0].Lessons[0].VideoUrl);
+        Assert.Empty(catalog.Items);
+        Assert.Null(detail);
+        Assert.Empty(administrative);
+        Assert.True(await fixture.Context.Courses.AnyAsync(item => item.Id == course.Id));
     }
     [Fact]
     public async Task CourseCanBeArchivedAndRestoredWithoutDeletingItsHistory()
@@ -568,34 +549,26 @@ public sealed class CourseDomainTests
     public async Task CoursePurchaseRejectsCompletedClasses()
     {
         await using var fixture = await TestFixture.CreateAsync();
-        var product = new Product
-        {
-            Nome = "Curso concluido",
-            TipoProduto = "course",
-            Preco = 100m
-        };
         var course = new Course
         {
-            Nome = product.Nome,
-            Preco = product.Preco,
-            LegacyProduct = product
+            Nome = "Curso concluido",
+            Preco = 100m
         };
         var courseClass = new CourseClass
         {
             Course = course,
-            Produto = product,
             Status = "completed",
             DataRealizacao = DateTime.UtcNow.AddDays(2),
             Capacity = 5,
             AvailableSeats = 5,
             VafasDisponiveis = 5
         };
-        fixture.Context.AddRange(product, course, courseClass);
+        fixture.Context.AddRange(course, courseClass);
         await fixture.Context.SaveChangesAsync();
 
         var result = await new InventoryService(fixture.Context).ValidateAndReserveAsync(new List<CreateOrderItemDTO>
         {
-            new() { ProdutoId = product.Id, TurmaId = courseClass.Id, Quantidade = 1 }
+            new() { CourseId = course.Id, TurmaId = courseClass.Id, Quantidade = 1 }
         });
 
         Assert.False(result.Success);
@@ -606,34 +579,26 @@ public sealed class CourseDomainTests
     public async Task CoursePurchaseRejectsMoreThanMaximumQuantity()
     {
         await using var fixture = await TestFixture.CreateAsync();
-        var product = new Product
-        {
-            Nome = "Curso com limite",
-            TipoProduto = "course",
-            Preco = 100m
-        };
         var course = new Course
         {
-            Nome = product.Nome,
-            Preco = product.Preco,
-            LegacyProduct = product
+            Nome = "Curso com limite",
+            Preco = 100m
         };
         var courseClass = new CourseClass
         {
             Course = course,
-            Produto = product,
             Status = "scheduled",
             DataRealizacao = DateTime.UtcNow.AddDays(2),
             Capacity = 10,
             AvailableSeats = 10,
             VafasDisponiveis = 10
         };
-        fixture.Context.AddRange(product, course, courseClass);
+        fixture.Context.AddRange(course, courseClass);
         await fixture.Context.SaveChangesAsync();
 
         var result = await new InventoryService(fixture.Context).ValidateAndReserveAsync(new List<CreateOrderItemDTO>
         {
-            new() { ProdutoId = product.Id, TurmaId = courseClass.Id, Quantidade = 6 }
+            new() { CourseId = course.Id, TurmaId = courseClass.Id, Quantidade = 6 }
         });
 
         Assert.False(result.Success);
@@ -641,28 +606,17 @@ public sealed class CourseDomainTests
     }
 
     [Fact]
-    public async Task NewOrdersRejectNonCourseProducts()
+    public async Task NewOrdersRejectArchivedCourses()
     {
         await using var fixture = await TestFixture.CreateAsync();
-        var product = new Product
-        {
-            Nome = "Produto legado",
-            TipoProduto = "equipment",
-            Preco = 100m,
-            Estoque = 5
-        };
-        fixture.Context.Products.Add(product);
+        var course = new Course { Nome = "Curso arquivado", Preco = 100m, IsActive = false };
+        fixture.Context.Courses.Add(course);
         await fixture.Context.SaveChangesAsync();
-
-        var result = await new InventoryService(fixture.Context).ValidateAndReserveAsync(new List<CreateOrderItemDTO>
-        {
-            new() { ProdutoId = product.Id, Quantidade = 1 }
-        });
-
+        var result = await new InventoryService(fixture.Context).ValidateAndReserveAsync(
+            new List<CreateOrderItemDTO> { new() { CourseId = course.Id, Quantidade = 1 } });
         Assert.False(result.Success);
-        Assert.Contains("somente cursos", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("arquivado", result.Error, StringComparison.OrdinalIgnoreCase);
     }
-
     [Fact]
     public async Task CatalogOptionsIncludeOnlyAvailableActiveCourseData()
     {
@@ -692,6 +646,38 @@ public sealed class CourseDomainTests
 
         Assert.Contains("Urgencia", options.Categories);
         Assert.Contains("Campinas", options.Cities);
+    }
+
+    [Fact]
+    public async Task CourseWithClassesCannotBeDeleted()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var course = new Course { Nome = "Curso", Preco = 100m };
+        var courseClass = new CourseClass
+        {
+            Course = course, Capacity = 3, AvailableSeats = 3,
+            DataRealizacao = DateTime.UtcNow.AddDays(10)
+        };
+        fixture.Context.AddRange(course, courseClass);
+        await fixture.Context.SaveChangesAsync();
+        fixture.Context.ChangeTracker.Clear();
+        fixture.Context.Courses.Remove(new Course { Id = course.Id });
+        await Assert.ThrowsAsync<DbUpdateException>(() => fixture.Context.SaveChangesAsync());
+        Assert.Equal(1, await fixture.Context.CourseClasses.CountAsync());
+    }
+    [Fact]
+    public async Task ClassCannotBeSavedWithoutAValidCourse()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        fixture.Context.CourseClasses.Add(new CourseClass
+        {
+            CourseId = 987654,
+            Capacity = 3,
+            AvailableSeats = 3,
+            DataRealizacao = DateTime.UtcNow.AddDays(10)
+        });
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => fixture.Context.SaveChangesAsync());
     }
 
     private sealed class TestFixture : IAsyncDisposable

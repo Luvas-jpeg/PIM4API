@@ -15,7 +15,7 @@ public class CreateOrderDTO
 
 public class CreateOrderItemDTO
 {
-    public int ProdutoId { get; set; }
+    public int CourseId { get; set; }
     public int? TurmaId { get; set; }
 
     public int Quantidade { get; set; }

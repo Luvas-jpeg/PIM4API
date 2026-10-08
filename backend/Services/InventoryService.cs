@@ -5,144 +5,73 @@ using EquipamentosMedicosApi.Models;
 
 namespace EquipamentosMedicosApi.Services;
 
-public class InventoryService
+public class InventoryService(AppDbContext context)
 {
     public const int MaxCourseQuantityPerOrder = 5;
 
-    private readonly AppDbContext _context;
-
-    public InventoryService(AppDbContext context)
-    {
-        _context = context;
-    }
-
-    public async Task<ServiceResult<Dictionary<int, Product>>> ValidateAndReserveAsync(List<CreateOrderItemDTO> items)
+    public async Task<ServiceResult<Dictionary<int, Course>>> ValidateAndReserveAsync(List<CreateOrderItemDTO> items)
     {
         if (items.Count == 0)
+            return ServiceResult<Dictionary<int, Course>>.Fail("Pedido deve possuir ao menos um item.");
+
+        foreach (var group in items.GroupBy(item => item.CourseId))
         {
-            return ServiceResult<Dictionary<int, Product>>.Fail("Pedido deve possuir ao menos um item.");
+            if (group.Any(item => item.Quantidade <= 0))
+                return ServiceResult<Dictionary<int, Course>>.Fail("Quantidade deve ser maior que zero.");
+            if (group.Sum(item => (long)item.Quantidade) > MaxCourseQuantityPerOrder)
+                return ServiceResult<Dictionary<int, Course>>.Fail(
+                    $"A quantidade maxima por pedido para cursos e {MaxCourseQuantityPerOrder} inscricoes.");
+            if (group.Select(item => item.TurmaId).Distinct().Count() > 1)
+                return ServiceResult<Dictionary<int, Course>>.Fail("Selecione apenas uma turma por curso no pedido.");
         }
 
-        var productIds = items
-            .Select(item => item.ProdutoId)
-            .Distinct()
-            .ToList();
-
-        var products = await _context.Products
-            .Where(product => productIds.Contains(product.Id))
-            .ToDictionaryAsync(product => product.Id);
+        var courseIds = items.Select(item => item.CourseId).Distinct().ToList();
+        var courses = await context.Courses
+            .Where(course => courseIds.Contains(course.Id))
+            .ToDictionaryAsync(course => course.Id);
 
         foreach (var item in items)
         {
-            if (!products.TryGetValue(item.ProdutoId, out var product))
-            {
-                return ServiceResult<Dictionary<int, Product>>.Fail($"Produto #{item.ProdutoId} nao encontrado.");
-            }
+            if (!courses.TryGetValue(item.CourseId, out var course))
+                return ServiceResult<Dictionary<int, Course>>.Fail($"Curso #{item.CourseId} nao encontrado.");
+            if (!course.IsActive)
+                return ServiceResult<Dictionary<int, Course>>.Fail("O curso informado esta arquivado.");
 
-            if (item.Quantidade <= 0)
-            {
-                return ServiceResult<Dictionary<int, Product>>.Fail("Quantidade deve ser maior que zero.");
-            }
-
-            if (item.Quantidade > MaxCourseQuantityPerOrder &&
-                product.TipoProduto == "course")
-            {
-                return ServiceResult<Dictionary<int, Product>>.Fail(
-                    $"A quantidade maxima por pedido para cursos e {MaxCourseQuantityPerOrder} inscricoes.");
-            }
-
-            if (product.TipoProduto != "course")
-            {
-                return ServiceResult<Dictionary<int, Product>>.Fail(
-                    "A loja aceita somente cursos.");
-            }
-
-            var migratedCourse = product.TipoProduto == "course"
-                ? await _context.Courses.FirstOrDefaultAsync(course => course.LegacyProductId == product.Id)
-                : null;
-
-            if (migratedCourse?.DeliveryMode == "presencial" && !item.TurmaId.HasValue)
-            {
-                return ServiceResult<Dictionary<int, Product>>.Fail(
-                    $"O curso '{product.Nome}' exige a selecao de uma turma.");
-            }
-
-            if (migratedCourse?.DeliveryMode == "ead")
+            if (course.DeliveryMode == "ead")
             {
                 if (item.TurmaId.HasValue)
-                {
-                    return ServiceResult<Dictionary<int, Product>>.Fail(
-                        $"O curso EAD '{product.Nome}' nao deve possuir turma.");
-                }
-
+                    return ServiceResult<Dictionary<int, Course>>.Fail(
+                        $"O curso EAD '{course.Nome}' nao deve possuir turma.");
                 continue;
             }
+            if (!item.TurmaId.HasValue)
+                return ServiceResult<Dictionary<int, Course>>.Fail(
+                    $"O curso '{course.Nome}' exige a selecao de uma turma.");
 
-            if (item.TurmaId.HasValue)
-            {
-                if (product.TipoProduto != "course")
-                {
-                    return ServiceResult<Dictionary<int, Product>>.Fail(
-                        $"O produto '{product.Nome}' nao possui turmas.");
-                }
+            var courseClass = await context.CourseClasses.AsNoTracking()
+                .FirstOrDefaultAsync(candidate => candidate.Id == item.TurmaId.Value);
+            if (courseClass == null || courseClass.CourseId != course.Id)
+                return ServiceResult<Dictionary<int, Course>>.Fail(
+                    $"Turma #{item.TurmaId.Value} nao pertence ao curso informado.");
+            if (courseClass.Status != "scheduled")
+                return ServiceResult<Dictionary<int, Course>>.Fail("A turma selecionada nao esta com inscricoes abertas.");
+            var now = DateTime.UtcNow;
+            if (courseClass.DataRealizacao < now)
+                return ServiceResult<Dictionary<int, Course>>.Fail("Nao e possivel comprar uma turma que ja iniciou.");
 
-                var courseClass = await _context.CourseClasses
-                    .Include(courseClass => courseClass.Course)
-                    .FirstOrDefaultAsync(courseClass => courseClass.Id == item.TurmaId.Value);
-
-                if (courseClass == null ||
-                    (courseClass.CourseId.HasValue &&
-                     courseClass.Course?.LegacyProductId != product.Id) ||
-                    (!courseClass.CourseId.HasValue && courseClass.ProdutoId != product.Id))
-                {
-                    return ServiceResult<Dictionary<int, Product>>.Fail(
-                        $"Turma #{item.TurmaId.Value} nao pertence ao curso informado.");
-                }
-
-                if (courseClass.Status != "scheduled")
-                {
-                    return ServiceResult<Dictionary<int, Product>>.Fail(
-                        "A turma selecionada nao esta com inscricoes abertas.");
-                }
-
-                if (courseClass.DataRealizacao < DateTime.UtcNow)
-                {
-                    return ServiceResult<Dictionary<int, Product>>.Fail(
-                        "Nao e possivel comprar uma turma que ja iniciou.");
-                }
-
-                var reservedSeats = await _context.CourseClasses
-                    .Where(candidate =>
-                        candidate.Id == item.TurmaId.Value &&
-                        candidate.Status != "cancelled" &&
-                        candidate.AvailableSeats >= item.Quantidade)
-                    .ExecuteUpdateAsync(setters => setters
-                        .SetProperty(
-                            candidate => candidate.AvailableSeats,
-                            candidate => candidate.AvailableSeats - item.Quantidade)
-                        .SetProperty(
-                            candidate => candidate.VafasDisponiveis,
-                            candidate => candidate.VafasDisponiveis - item.Quantidade));
-
-                if (reservedSeats == 0)
-                {
-                    return ServiceResult<Dictionary<int, Product>>.Fail(
-                        $"Vagas insuficientes na turma selecionada para {product.Nome}.");
-                }
-
-                continue;
-            }
-
-            var currentStock = product.Estoque ?? 0;
-
-            if (currentStock < item.Quantidade)
-            {
-                return ServiceResult<Dictionary<int, Product>>.Fail($"Estoque/vagas insuficientes para {product.Nome}.");
-            }
-
-            product.Estoque = currentStock - item.Quantidade;
+            var reserved = await context.CourseClasses
+                .Where(candidate => candidate.Id == item.TurmaId.Value &&
+                    candidate.CourseId == course.Id && candidate.Status == "scheduled" &&
+                    candidate.DataRealizacao >= now && candidate.AvailableSeats >= item.Quantidade)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(candidate => candidate.AvailableSeats,
+                        candidate => candidate.AvailableSeats - item.Quantidade)
+                    .SetProperty(candidate => candidate.VafasDisponiveis,
+                        candidate => candidate.VafasDisponiveis - item.Quantidade));
+            if (reserved == 0)
+                return ServiceResult<Dictionary<int, Course>>.Fail(
+                    $"Vagas insuficientes na turma selecionada para {course.Nome}.");
         }
-
-        return ServiceResult<Dictionary<int, Product>>.Ok(products);
+        return ServiceResult<Dictionary<int, Course>>.Ok(courses);
     }
 }

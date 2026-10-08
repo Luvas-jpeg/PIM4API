@@ -22,7 +22,7 @@ public sealed class OrderPaymentFlowTests
         Assert.NotNull(result.Data);
         Assert.Equal(0, await fixture.Context.Enrollments.CountAsync());
         Assert.Equal("pending", (await fixture.Context.Orders.SingleAsync()).PaymentStatus);
-        Assert.Equal(1, (await fixture.Context.Products.SingleAsync(product => product.Id == fixture.CourseId)).Estoque);
+        Assert.Equal(1, (await fixture.Context.CourseClasses.AsNoTracking().SingleAsync(courseClass => courseClass.Id == fixture.CourseId)).AvailableSeats);
     }
 
     [Fact]
@@ -48,19 +48,13 @@ public sealed class OrderPaymentFlowTests
     public async Task ApprovedEadPaymentCreatesEnrollmentWithoutClass()
     {
         await using var fixture = await TestFixture.CreateAsync();
-        var product = await fixture.Context.Products.SingleAsync(product => product.Id == fixture.CourseId);
-        var course = new Course
-        {
-            Nome = product.Nome,
-            Preco = product.Preco,
-            DeliveryMode = "ead",
-            LegacyProductId = product.Id
-        };
-        fixture.Context.Courses.Add(course);
+        var course = await fixture.Context.Courses.SingleAsync(item => item.Id == fixture.CourseId);
+        course.DeliveryMode = "ead";
         await fixture.Context.SaveChangesAsync();
-
         var service = fixture.CreateOrderService();
-        var orderResult = await service.CreateAsync(fixture.UserId, CreateRequest());
+        var request = CreateRequest();
+        request.Itens[0].TurmaId = null;
+        var orderResult = await service.CreateAsync(fixture.UserId, request);
         var webhook = await service.ProcessPaymentWebhookAsync(
             orderResult.Data!.OrderId, "gateway-payment-ead", "paid");
 
@@ -68,9 +62,9 @@ public sealed class OrderPaymentFlowTests
         var enrollment = await fixture.Context.Enrollments.SingleAsync();
         Assert.Equal(course.Id, enrollment.CourseId);
         Assert.Null(enrollment.ClassId);
-        Assert.Equal(2, await fixture.Context.Products
+        Assert.Equal(2, await fixture.Context.CourseClasses
             .Where(item => item.Id == fixture.CourseId)
-            .Select(item => item.Estoque)
+            .Select(item => item.AvailableSeats)
             .SingleAsync());
     }
 
@@ -86,7 +80,7 @@ public sealed class OrderPaymentFlowTests
         Assert.True(result.Success);
         Assert.Equal(0, await fixture.Context.Enrollments.CountAsync());
         Assert.Equal("cancelled", (await fixture.Context.Orders.SingleAsync()).Status);
-        Assert.Equal(2, (await fixture.Context.Products.SingleAsync(product => product.Id == fixture.CourseId)).Estoque);
+        Assert.Equal(2, (await fixture.Context.CourseClasses.AsNoTracking().SingleAsync(courseClass => courseClass.Id == fixture.CourseId)).AvailableSeats);
     }
 
     [Fact]
@@ -105,7 +99,7 @@ public sealed class OrderPaymentFlowTests
         Assert.Equal(1, await fixture.Context.Enrollments.CountAsync());
         Assert.All(await fixture.Context.Enrollments.ToListAsync(), enrollment =>
             Assert.Equal("cancelled", enrollment.Status));
-        Assert.Equal(2, (await fixture.Context.Products.SingleAsync(product => product.Id == fixture.CourseId)).Estoque);
+        Assert.Equal(2, (await fixture.Context.CourseClasses.AsNoTracking().SingleAsync(courseClass => courseClass.Id == fixture.CourseId)).AvailableSeats);
     }
 
     [Fact]
@@ -130,8 +124,8 @@ public sealed class OrderPaymentFlowTests
         Assert.True(refund.Success);
         Assert.True(repeatedRefund.Success);
         Assert.Equal("refunded", (await fixture.Context.Orders.SingleAsync()).PaymentStatus);
-        Assert.Equal(2, (await fixture.Context.Products
-            .SingleAsync(product => product.Id == fixture.CourseId)).Estoque);
+        Assert.Equal(2, (await fixture.Context.CourseClasses
+            .SingleAsync(courseClass => courseClass.Id == fixture.CourseId)).AvailableSeats);
         Assert.All(await fixture.Context.Enrollments.ToListAsync(), enrollment =>
             Assert.Equal("cancelled", enrollment.Status));
     }
@@ -148,7 +142,7 @@ public sealed class OrderPaymentFlowTests
 
         Assert.True(result.Success);
         Assert.Equal(0, await fixture.Context.Enrollments.CountAsync());
-        Assert.Equal(2, (await fixture.Context.Products.SingleAsync(product => product.Id == fixture.CourseId)).Estoque);
+        Assert.Equal(2, (await fixture.Context.CourseClasses.AsNoTracking().SingleAsync(courseClass => courseClass.Id == fixture.CourseId)).AvailableSeats);
     }
 
     [Fact]
@@ -183,8 +177,8 @@ public sealed class OrderPaymentFlowTests
         Assert.Equal(0, repeated);
         Assert.Equal("cancelled", order.Status);
         Assert.Equal("cancelled", order.PaymentStatus);
-        Assert.Equal(2, (await fixture.Context.Products
-            .SingleAsync(product => product.Id == fixture.CourseId)).Estoque);
+        Assert.Equal(2, (await fixture.Context.CourseClasses
+            .SingleAsync(courseClass => courseClass.Id == fixture.CourseId)).AvailableSeats);
     }
 
     [Fact]
@@ -220,6 +214,119 @@ public sealed class OrderPaymentFlowTests
         Assert.Equal("pending", order.PaymentStatus);
     }
 
+    [Fact]
+    public async Task OrderPreservesPurchasedCourseNameAndPriceAfterCatalogChanges()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var service = fixture.CreateOrderService();
+        var created = await service.CreateAsync(fixture.UserId, CreateRequest());
+        Assert.True(created.Success);
+
+        var course = await fixture.Context.Courses.FindAsync(fixture.CourseId);
+        course!.Nome = "Nome alterado";
+        course.Preco = 999m;
+        await fixture.Context.SaveChangesAsync();
+        fixture.Context.ChangeTracker.Clear();
+
+        var result = await service.GetByIdAsync(fixture.UserId, created.Data!.OrderId);
+        var item = Assert.Single(result.Data!.Itens);
+        Assert.Equal(fixture.CourseId, item.CourseId);
+        Assert.Equal("Curso de Teste", item.Nome);
+        Assert.Equal(100m, item.PrecoUnitario);
+        Assert.Equal(100m, result.Data.Total);
+    }
+
+    [Fact]
+    public async Task SplitItemsCannotBypassCourseQuantityLimit()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var request = CreateRequest();
+        request.Itens = new List<CreateOrderItemDTO>
+        {
+            new() { CourseId = fixture.CourseId, TurmaId = 99, Quantidade = 3 },
+            new() { CourseId = fixture.CourseId, TurmaId = 99, Quantidade = 3 }
+        };
+        var result = await fixture.CreateOrderService().CreateAsync(fixture.UserId, request);
+        Assert.False(result.Success);
+        Assert.Equal(0, await fixture.Context.Orders.CountAsync());
+        Assert.Equal(2, await fixture.Context.CourseClasses.Select(item => item.AvailableSeats).SingleAsync());
+    }
+
+    [Theory]
+    [InlineData("paid")]
+    [InlineData("refused")]
+    [InlineData("cancelled")]
+    public async Task LaterEventDoesNotRegressApprovedPayment(string status)
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var service = fixture.CreateOrderService();
+        var created = await service.CreateAsync(fixture.UserId, CreateRequest());
+        await service.ProcessPaymentWebhookAsync("approved", created.Data!.OrderId, "payment", "paid");
+        var result = await service.ProcessPaymentWebhookAsync("later", created.Data.OrderId, "payment", status);
+        Assert.True(result.Success);
+        var order = await fixture.Context.Orders.SingleAsync();
+        Assert.Equal("paid", order.PaymentStatus);
+        Assert.Equal("processing", order.Status);
+        Assert.Single(await fixture.Context.Enrollments.ToListAsync());
+        Assert.Equal(1, await fixture.Context.CourseClasses.AsNoTracking().Select(c => c.AvailableSeats).SingleAsync());
+        Assert.Equal(2, await fixture.Context.PaymentWebhookEvents.CountAsync());
+    }
+
+    [Fact]
+    public async Task DifferentFailureEventsReleaseSeatsOnlyOnce()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var service = fixture.CreateOrderService();
+        var created = await service.CreateAsync(fixture.UserId, CreateRequest());
+        await service.ProcessPaymentWebhookAsync("refusal", created.Data!.OrderId, "payment", "refused");
+        var result = await service.ProcessPaymentWebhookAsync("cancellation", created.Data.OrderId, "payment", "cancelled");
+        Assert.True(result.Success);
+        Assert.Equal("refused", (await fixture.Context.Orders.SingleAsync()).PaymentStatus);
+        Assert.Equal(2, await fixture.Context.CourseClasses.AsNoTracking().Select(c => c.AvailableSeats).SingleAsync());
+    }
+
+    [Fact]
+    public async Task ApprovalAfterExpirationDoesNotEnrollWithoutReservedSeats()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var service = fixture.CreateOrderService();
+        var created = await service.CreateAsync(fixture.UserId, CreateRequest());
+        var order = await fixture.Context.Orders.SingleAsync();
+        order.DataPedido = DateTime.UtcNow.AddMinutes(-31);
+        await fixture.Context.SaveChangesAsync();
+        await service.ExpirePendingOrdersAsync(TimeSpan.FromMinutes(30));
+        var result = await service.ProcessPaymentWebhookAsync("late", created.Data!.OrderId, "payment", "paid");
+        Assert.False(result.Success);
+        Assert.Equal("cancelled", order.PaymentStatus);
+        Assert.Empty(await fixture.Context.Enrollments.ToListAsync());
+        Assert.Equal(2, await fixture.Context.CourseClasses.AsNoTracking().Select(c => c.AvailableSeats).SingleAsync());
+    }
+
+    [Fact]
+    public async Task RefundBeforeApprovalIsRejected()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var service = fixture.CreateOrderService();
+        var created = await service.CreateAsync(fixture.UserId, CreateRequest());
+        var result = await service.ProcessPaymentWebhookAsync("refund", created.Data!.OrderId, "payment", "refunded");
+        Assert.False(result.Success);
+        Assert.Equal("pending", (await fixture.Context.Orders.SingleAsync()).PaymentStatus);
+        Assert.Equal(1, await fixture.Context.CourseClasses.AsNoTracking().Select(c => c.AvailableSeats).SingleAsync());
+    }
+
+    [Fact]
+    public async Task EventCannotBeReusedForAnotherOrder()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var service = fixture.CreateOrderService();
+        var first = await service.CreateAsync(fixture.UserId, CreateRequest());
+        var second = await service.CreateAsync(fixture.AnotherUserId, CreateRequest());
+        await service.ProcessPaymentWebhookAsync("shared", first.Data!.OrderId, "payment", "paid");
+        var result = await service.ProcessPaymentWebhookAsync("shared", second.Data!.OrderId, "payment", "paid");
+        Assert.False(result.Success);
+        Assert.Equal("pending", (await fixture.Context.Orders.SingleAsync(o => o.Id == second.Data.OrderId)).PaymentStatus);
+    }
+
     private static CreateOrderDTO CreateRequest()
     {
         return new CreateOrderDTO
@@ -227,7 +334,7 @@ public sealed class OrderPaymentFlowTests
             PaymentMethod = "pix",
             Itens = new List<CreateOrderItemDTO>
             {
-                new() { ProdutoId = 99, Quantidade = 1 }
+                new() { CourseId = 99, TurmaId = 99, Quantidade = 1 }
             }
         };
     }
@@ -275,16 +382,15 @@ public sealed class OrderPaymentFlowTests
                 SenhaHash = "hash",
                 Role = "Cliente"
             });
-            context.Products.Add(new Product
+            context.Courses.Add(new Course
             {
-                Id = 99,
-                Nome = "Curso de Teste",
-                Preco = 100m,
-                TipoProduto = "course",
-                Estoque = 2,
-                Date = "15/04/2026",
-                Location = "Online",
-                Instructor = "Instrutor Teste"
+                Id = 99, Nome = "Curso de Teste", Preco = 100m, DeliveryMode = "presencial"
+            });
+            context.CourseClasses.Add(new CourseClass
+            {
+                Id = 99, CourseId = 99, Capacity = 2, AvailableSeats = 2,
+                VafasDisponiveis = 2, DataRealizacao = DateTime.UtcNow.AddDays(10),
+                Local = "Sao Paulo", Instructor = "Instrutor Teste", Status = "scheduled"
             });
             await context.SaveChangesAsync();
 

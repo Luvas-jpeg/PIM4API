@@ -92,9 +92,6 @@ namespace backend.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
-                    b.Property<int?>("LegacyProductId")
-                        .HasColumnType("integer");
-
                     b.Property<string>("Nome")
                         .IsRequired()
                         .HasColumnType("text");
@@ -108,10 +105,6 @@ namespace backend.Migrations
                         .HasDefaultValue(0);
 
                     b.HasKey("Id");
-
-                    b.HasIndex("LegacyProductId")
-                        .IsUnique()
-                        .HasFilter("\"LegacyProductId\" IS NOT NULL");
 
                     b.ToTable("Courses");
                 });
@@ -271,7 +264,7 @@ namespace backend.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(0);
 
-                    b.Property<int?>("CourseId")
+                    b.Property<int>("CourseId")
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("DataRealizacao")
@@ -288,9 +281,6 @@ namespace backend.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int?>("ProdutoId")
-                        .HasColumnType("integer");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -304,9 +294,44 @@ namespace backend.Migrations
 
                     b.HasIndex("CourseId");
 
-                    b.HasIndex("ProdutoId");
-
                     b.ToTable("CourseClasses");
+                });
+
+            modelBuilder.Entity("EquipamentosMedicosApi.Models.CourseInterest", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CourseId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Phone")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CourseId", "Email")
+                        .IsUnique();
+
+                    b.ToTable("CourseInterests");
                 });
 
             modelBuilder.Entity("EquipamentosMedicosApi.Models.CourseLesson", b =>
@@ -578,14 +603,22 @@ namespace backend.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("CourseId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ItemType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("NameSnapshot")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<int>("PedidoId")
                         .HasColumnType("integer");
 
                     b.Property<decimal>("PrecoUnitario")
                         .HasColumnType("numeric");
-
-                    b.Property<int>("ProdutoId")
-                        .HasColumnType("integer");
 
                     b.Property<int>("Quantidade")
                         .HasColumnType("integer");
@@ -595,9 +628,9 @@ namespace backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PedidoId");
+                    b.HasIndex("CourseId");
 
-                    b.HasIndex("ProdutoId");
+                    b.HasIndex("PedidoId");
 
                     b.HasIndex("TurmaId");
 
@@ -641,171 +674,6 @@ namespace backend.Migrations
                     b.HasIndex("OrderId");
 
                     b.ToTable("PaymentWebhookEvents");
-                });
-
-            modelBuilder.Entity("EquipamentosMedicosApi.Models.Product", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Date")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int?>("Estoque")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Image")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Instructor")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Location")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Nome")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<decimal>("Preco")
-                        .HasColumnType("numeric");
-
-                    b.Property<string>("TipoProduto")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Products");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            Category = "Diagnóstico",
-                            Date = "",
-                            Description = "Estetoscópio de alta precisão com membrana dupla, ideal para ausculta cardíaca e pulmonar.",
-                            Estoque = 15,
-                            Image = "https://images.unsplash.com/photo-1655313719612-8248b2c4d1e7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtZWRpY2FsJTIwZXF1aXBtZW50JTIwc3RldGhvc2NvcGV8ZW58MXx8fHwxNzczNTE3MTExfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-                            Instructor = "",
-                            Location = "",
-                            Nome = "Estetoscópio Profissional",
-                            Preco = 289.90m,
-                            TipoProduto = "equipment"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Category = "Monitoramento",
-                            Date = "",
-                            Description = "Monitor multiparamétrico com tela colorida para monitoramento de pressão arterial, frequência cardíaca e oximetria.",
-                            Estoque = 8,
-                            Image = "https://images.unsplash.com/photo-1770836037704-44bd8c7b6978?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxob3NwaXRhbCUyMGVxdWlwbWVudCUyMG1vbml0b3J8ZW58MXx8fHwxNzczNTE3MTEyfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-                            Instructor = "",
-                            Location = "",
-                            Nome = "Monitor de Sinais Vitais",
-                            Preco = 3599.00m,
-                            TipoProduto = "equipment"
-                        },
-                        new
-                        {
-                            Id = 3,
-                            Category = "EPI",
-                            Date = "",
-                            Description = "Luvas cirúrgicas em látex, estéreis e de alta qualidade. Tamanhos variados disponíveis.",
-                            Estoque = 50,
-                            Image = "https://images.unsplash.com/photo-1758206523660-3ef5a51f1113?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtZWRpY2FsJTIwZ2xvdmVzJTIwc3VyZ2ljYWx8ZW58MXx8fHwxNzczNTE3MTEyfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-                            Instructor = "",
-                            Location = "",
-                            Nome = "Luvas Cirúrgicas Estéreis - Caixa com 50 pares",
-                            Preco = 159.90m,
-                            TipoProduto = "equipment"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            Category = "Emergência",
-                            Date = "",
-                            Description = "DEA portátil com instruções de voz e análise automática do ritmo cardíaco. Ideal para ambientes públicos.",
-                            Estoque = 5,
-                            Image = "https://images.unsplash.com/photo-1762161916712-09592fa05b20?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxkZWZpYnJpbGxhdG9yJTIwZW1lcmdlbmN5JTIwbWVkaWNhbHxlbnwxfHx8fDE3NzM1MTcxMTN8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-                            Instructor = "",
-                            Location = "",
-                            Nome = "Desfibrilador Automático Externo (DEA)",
-                            Preco = 8999.00m,
-                            TipoProduto = "equipment"
-                        },
-                        new
-                        {
-                            Id = 5,
-                            Category = "Primeiros Socorros",
-                            Date = "15/04/2026 - 16/04/2026",
-                            Description = "Aprenda técnicas essenciais de primeiros socorros, RCP e uso de DEA. Certificado reconhecido nacionalmente.",
-                            Estoque = 20,
-                            Image = "https://images.unsplash.com/photo-1622115585848-1d5b6e8af4e4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmaXJzdCUyMGFpZCUyMHRyYWluaW5nfGVufDF8fHx8MTc3MzUxNzExM3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-                            Instructor = "Dr. Carlos Silva",
-                            Location = "São Paulo - SP",
-                            Nome = "Curso de Primeiros Socorros Básico",
-                            Preco = 450.00m,
-                            TipoProduto = "course"
-                        },
-                        new
-                        {
-                            Id = 6,
-                            Category = "Treinamento Avançado",
-                            Date = "22/04/2026 - 23/04/2026",
-                            Description = "Treinamento avançado para profissionais de saúde em emergências cardiovasculares. Carga horária de 16h.",
-                            Estoque = 15,
-                            Image = "https://images.unsplash.com/photo-1659353887019-b142198f2668?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtZWRpY2FsJTIwdHJhaW5pbmclMjBjb3Vyc2V8ZW58MXx8fHwxNzczNTE3MTEyfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-                            Instructor = "Dra. Ana Paula Costa",
-                            Location = "Rio de Janeiro - RJ",
-                            Nome = "Curso de Suporte Avançado de Vida (ACLS)",
-                            Preco = 1200.00m,
-                            TipoProduto = "course"
-                        },
-                        new
-                        {
-                            Id = 7,
-                            Category = "Workshop",
-                            Date = "10/05/2026",
-                            Description = "Práticas intensivas de diferentes técnicas de sutura em modelos sintéticos. Aula prática com supervisão.",
-                            Estoque = 12,
-                            Image = "https://images.unsplash.com/photo-1659353887019-b142198f2668?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtZWRpY2FsJTIwdHJhaW5pbmclMjBjb3Vyc2V8ZW58MXx8fHwxNzczNTE3MTEyfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-                            Instructor = "Dr. Roberto Mendes",
-                            Location = "Belo Horizonte - MG",
-                            Nome = "Workshop de Técnicas de Sutura",
-                            Preco = 890.00m,
-                            TipoProduto = "course"
-                        },
-                        new
-                        {
-                            Id = 8,
-                            Category = "Biossegurança",
-                            Date = "18/04/2026",
-                            Description = "Normas e práticas de biossegurança em ambientes hospitalares. Essencial para toda equipe de saúde.",
-                            Estoque = 25,
-                            Image = "https://images.unsplash.com/photo-1622115585848-1d5b6e8af4e4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmaXJzdCUyMGFpZCUyMHRyYWluaW5nfGVufDF8fHx8MTc3MzUxNzExM3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-                            Instructor = "Enf. Marina Oliveira",
-                            Location = "Curitiba - PR",
-                            Nome = "Curso de Biossegurança Hospitalar",
-                            Preco = 350.00m,
-                            TipoProduto = "course"
-                        });
                 });
 
             modelBuilder.Entity("EquipamentosMedicosApi.Models.PromoCode", b =>
@@ -1079,16 +947,6 @@ namespace backend.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("EquipamentosMedicosApi.Models.Course", b =>
-                {
-                    b.HasOne("EquipamentosMedicosApi.Models.Product", "LegacyProduct")
-                        .WithMany()
-                        .HasForeignKey("LegacyProductId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("LegacyProduct");
-                });
-
             modelBuilder.Entity("EquipamentosMedicosApi.Models.CourseAssessment", b =>
                 {
                     b.HasOne("EquipamentosMedicosApi.Models.Course", "Course")
@@ -1178,16 +1036,21 @@ namespace backend.Migrations
                     b.HasOne("EquipamentosMedicosApi.Models.Course", "Course")
                         .WithMany("Classes")
                         .HasForeignKey("CourseId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("EquipamentosMedicosApi.Models.Product", "Produto")
-                        .WithMany("Turmas")
-                        .HasForeignKey("ProdutoId")
-                        .OnDelete(DeleteBehavior.Cascade);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.Navigation("Course");
+                });
 
-                    b.Navigation("Produto");
+            modelBuilder.Entity("EquipamentosMedicosApi.Models.CourseInterest", b =>
+                {
+                    b.HasOne("EquipamentosMedicosApi.Models.Course", "Course")
+                        .WithMany()
+                        .HasForeignKey("CourseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Course");
                 });
 
             modelBuilder.Entity("EquipamentosMedicosApi.Models.CourseLesson", b =>
@@ -1291,15 +1154,14 @@ namespace backend.Migrations
 
             modelBuilder.Entity("EquipamentosMedicosApi.Models.OrderItem", b =>
                 {
+                    b.HasOne("EquipamentosMedicosApi.Models.Course", "Course")
+                        .WithMany()
+                        .HasForeignKey("CourseId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("EquipamentosMedicosApi.Models.Order", "Pedido")
                         .WithMany("Itens")
                         .HasForeignKey("PedidoId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("EquipamentosMedicosApi.Models.Product", "Produto")
-                        .WithMany()
-                        .HasForeignKey("ProdutoId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -1307,9 +1169,9 @@ namespace backend.Migrations
                         .WithMany()
                         .HasForeignKey("TurmaId");
 
-                    b.Navigation("Pedido");
+                    b.Navigation("Course");
 
-                    b.Navigation("Produto");
+                    b.Navigation("Pedido");
 
                     b.Navigation("Turma");
                 });
@@ -1387,11 +1249,6 @@ namespace backend.Migrations
                     b.Navigation("Enrollments");
 
                     b.Navigation("Itens");
-                });
-
-            modelBuilder.Entity("EquipamentosMedicosApi.Models.Product", b =>
-                {
-                    b.Navigation("Turmas");
                 });
 
             modelBuilder.Entity("EquipamentosMedicosApi.Models.Student", b =>

@@ -48,8 +48,6 @@ namespace EquipamentosMedicosApi.Controllers
                 .Include(e => e.Course)
                 .Include(e => e.Class)
                     .ThenInclude(c => c!.Course)
-                .Include(e => e.Class)
-                    .ThenInclude(c => c!.Produto)
                 .Include(e => e.Student)
                 .Where(e => e.Student != null && e.Student.UserId == userId.Value)
                 .OrderByDescending(e => e.EnrolledAt)
@@ -58,18 +56,17 @@ namespace EquipamentosMedicosApi.Controllers
             var courses = enrollments.Select(e =>
             {
                 var course = e.Course ?? e.Class?.Course;
-                var legacyProduct = e.Class?.Produto;
 
                 return new MyEnrollmentResponse
                 {
                     EnrollmentId = e.Id,
-                    CourseId = course?.Id ?? legacyProduct?.Id,
+                    CourseId = course?.Id,
                     ClassId = e.ClassId,
                     OrderId = e.OrderId,
-                    CourseName = course?.Nome ?? legacyProduct?.Nome ?? string.Empty,
-                    CourseDescription = course?.Description ?? legacyProduct?.Description ?? string.Empty,
-                    CourseImage = course?.Image ?? legacyProduct?.Image ?? string.Empty,
-                    Category = course?.Category ?? legacyProduct?.Category ?? string.Empty,
+                    CourseName = course?.Nome ?? string.Empty,
+                    CourseDescription = course?.Description ?? string.Empty,
+                    CourseImage = course?.Image ?? string.Empty,
+                    Category = course?.Category ?? string.Empty,
                     DeliveryMode = course?.DeliveryMode ?? "presencial",
                     WorkloadHours = course?.WorkloadHours ?? 0,
                     Instructor = e.Class?.Instructor ?? string.Empty,
@@ -132,8 +129,6 @@ namespace EquipamentosMedicosApi.Controllers
                             .ThenInclude(question => question.Options)
                 .Include(item => item.Class)
                     .ThenInclude(courseClass => courseClass!.Course)
-                .Include(item => item.Class)
-                    .ThenInclude(courseClass => courseClass!.Produto)
                 .Include(item => item.Student)
                 .FirstOrDefaultAsync(item =>
                     item.Id == enrollmentId &&
@@ -144,7 +139,6 @@ namespace EquipamentosMedicosApi.Controllers
                 return NotFound(new { message = "Matricula nao encontrada." });
 
             var course = enrollment.Course ?? enrollment.Class?.Course;
-            var legacyProduct = enrollment.Class?.Produto;
             var certificate = course == null
                 ? null
                 : await _context.CourseCertificates
@@ -155,13 +149,13 @@ namespace EquipamentosMedicosApi.Controllers
             return Ok(new MyEnrollmentResponse
             {
                 EnrollmentId = enrollment.Id,
-                CourseId = course?.Id ?? legacyProduct?.Id,
+                CourseId = course?.Id,
                 ClassId = enrollment.ClassId,
                 OrderId = enrollment.OrderId,
-                CourseName = course?.Nome ?? legacyProduct?.Nome ?? string.Empty,
-                CourseDescription = course?.Description ?? legacyProduct?.Description ?? string.Empty,
-                CourseImage = course?.Image ?? legacyProduct?.Image ?? string.Empty,
-                Category = course?.Category ?? legacyProduct?.Category ?? string.Empty,
+                CourseName = course?.Nome ?? string.Empty,
+                CourseDescription = course?.Description ?? string.Empty,
+                CourseImage = course?.Image ?? string.Empty,
+                Category = course?.Category ?? string.Empty,
                 DeliveryMode = course?.DeliveryMode ?? "presencial",
                 WorkloadHours = course?.WorkloadHours ?? 0,
                 Instructor = enrollment.Class?.Instructor ?? string.Empty,
