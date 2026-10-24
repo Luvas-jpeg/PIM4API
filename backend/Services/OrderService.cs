@@ -40,6 +40,7 @@ public class OrderService
         CreateOrderDTO request,
         string? idempotencyKey = null)
     {
+        await using var transaction = await MutationTransaction.BeginAsync(_context);
         var user = await _context.Users.FirstOrDefaultAsync(u => u.ID == userId);
 
         if (user == null)
@@ -76,8 +77,16 @@ public class OrderService
             return ServiceResult<CreateOrderResponse>.Fail("Forma de pagamento invalida.");
         }
 
-        await using var transaction = await _context.Database.BeginTransactionAsync();
 
+        foreach (var item in request.Itens)
+        {
+            if (await _context.Enrollments.AnyAsync(e => e.Student != null && e.Student.UserId == userId &&
+                e.CourseId == item.CourseId && e.ClassId == item.TurmaId && e.Status != "cancelled"))
+                return ServiceResult<CreateOrderResponse>.Fail("Voce ja possui matricula nesta turma/curso.");
+            if (await _context.Orders.AnyAsync(o => o.UsuarioId == userId && o.PaymentStatus == "pending" &&
+                o.Itens.Any(i => i.CourseId == item.CourseId && i.TurmaId == item.TurmaId)))
+                return ServiceResult<CreateOrderResponse>.Fail("Voce ja possui pedido pendente para esta turma/curso. Consulte seus pedidos.");
+        }
         var inventoryResult = await _inventoryService.ValidateAndReserveAsync(request.Itens);
 
         if (!inventoryResult.Success || inventoryResult.Data == null)
@@ -112,7 +121,9 @@ public class OrderService
             ValorFrete = request.ValorFrete,
             PaymentMethod = paymentMethod,
             Installments = paymentMethod == "credit_card" ? request.Installments : null,
-            PromoCode = request.PromoCode.Trim().ToUpper(),
+            PromoCode = (request.PromoCode ?? "").Trim().ToUpperInvariant(),
+            PromoCodeId = string.IsNullOrWhiteSpace(request.PromoCode) ? null :
+                await _context.PromoCodes.Where(p => p.Code == request.PromoCode.Trim().ToUpper()).Select(p => (int?)p.Id).SingleAsync(),
             Itens = request.Itens.Select(item =>
             {
                 var course = courses[item.CourseId];
@@ -225,7 +236,7 @@ public class OrderService
 
     public async Task<ServiceResult<OrderResponse>> CancelAsync(int userId, int orderId)
     {
-        await using var transaction = await _context.Database.BeginTransactionAsync();
+        await using var transaction = await MutationTransaction.BeginAsync(_context);
 
         var order = await _context.Orders
             .Include(item => item.Itens)
@@ -234,7 +245,7 @@ public class OrderService
         if (order == null)
             return ServiceResult<OrderResponse>.Fail("Pedido nao encontrado.");
 
-        if (order.PaymentStatus == "paid" || order.Status is "completed" or "cancelled")
+        if (order.PaymentStatus != "pending")
             return ServiceResult<OrderResponse>.Fail("Pedido nao pode ser cancelado.");
 
         await ReleaseStockAsync(order);
@@ -251,7 +262,7 @@ public class OrderService
     {
         var cutoff = DateTime.UtcNow.Subtract(maxAge);
 
-        await using var transaction = await _context.Database.BeginTransactionAsync();
+        await using var transaction = await MutationTransaction.BeginAsync(_context);
 
         var orders = await _context.Orders
             .Include(order => order.Itens)
@@ -276,7 +287,7 @@ public class OrderService
 
     public async Task<ServiceResult<OrderResponse>> RefundAsync(int orderId, int? userId = null)
     {
-        await using var transaction = await _context.Database.BeginTransactionAsync();
+        await using var transaction = await MutationTransaction.BeginAsync(_context);
 
         var order = await _context.Orders
             .Include(item => item.Itens)
@@ -303,7 +314,11 @@ public class OrderService
             .ToListAsync();
 
         foreach (var enrollment in enrollments)
+        {
             enrollment.Status = "cancelled";
+            enrollment.ParticipationConfirmedAt = null;
+            enrollment.ParticipationStartDate = null;
+        }
 
         order.PaymentStatus = "refunded";
         order.Status = "cancelled";
@@ -336,7 +351,7 @@ public class OrderService
         if (string.IsNullOrWhiteSpace(eventId))
             return ServiceResult<OrderResponse>.Fail("EventId e obrigatorio.");
 
-        await using var transaction = await _context.Database.BeginTransactionAsync();
+        await using var transaction = await MutationTransaction.BeginAsync(_context);
 
         var existingEvent = await _context.PaymentWebhookEvents
             .Include(webhookEvent => webhookEvent.Order)
@@ -413,7 +428,11 @@ public class OrderService
             var enrollments = await _context.Enrollments
                 .Where(enrollment => enrollment.OrderId == order.Id).ToListAsync();
             foreach (var enrollment in enrollments)
+            {
                 enrollment.Status = "cancelled";
+                enrollment.ParticipationConfirmedAt = null;
+                enrollment.ParticipationStartDate = null;
+            }
             order.PaymentStatus = "refunded";
             order.Status = "cancelled";
         }
@@ -429,15 +448,29 @@ public class OrderService
 
     private async Task ReleaseStockAsync(Order order)
     {
-        foreach (var item in order.Itens.Where(item => item.TurmaId.HasValue))
+        if (order.PaymentStatus == "paid")
         {
-            await _context.CourseClasses
-                .Where(courseClass => courseClass.Id == item.TurmaId!.Value)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(courseClass => courseClass.AvailableSeats,
-                        courseClass => courseClass.AvailableSeats + item.Quantidade)
-                    .SetProperty(courseClass => courseClass.VafasDisponiveis,
-                        courseClass => courseClass.VafasDisponiveis + item.Quantidade));
+            var enrollments = await _context.Enrollments.Include(e => e.Class)
+                .Where(e => e.OrderId == order.Id).ToListAsync();
+            var states = new EnrollmentStateService(_context);
+            foreach (var enrollment in enrollments)
+                await states.ChangeAsync(enrollment, "cancelled");
+        }
+        else
+        {
+            foreach (var item in order.Itens.Where(i => i.TurmaId.HasValue))
+            {
+                await _context.CourseClasses.Where(c => c.Id == item.TurmaId!.Value)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(c => c.AvailableSeats,
+                        c => c.AvailableSeats + item.Quantidade > c.Capacity ? c.Capacity : c.AvailableSeats + item.Quantidade));
+                var tracked = _context.ChangeTracker.Entries<CourseClass>().FirstOrDefault(e => e.Entity.Id == item.TurmaId!.Value);
+                if (tracked != null) await tracked.ReloadAsync();
+            }
+        }
+        if (order.PromoCodeId.HasValue)
+        {
+            var promo = await _context.PromoCodes.FindAsync(order.PromoCodeId.Value);
+            if (promo != null) promo.UsageCount = Math.Max(0, promo.UsageCount - 1);
         }
     }
     public async Task<List<OrderResponse>> GetAllAsync()
@@ -489,19 +522,32 @@ public class OrderService
             return ServiceResult<object>.Fail("Status invalido.");
         }
 
-        var order = await _context.Orders.FirstOrDefaultAsync(o => o.Id == id);
+        await using var transaction = await MutationTransaction.BeginAsync(_context);
+        var order = await _context.Orders.Include(o => o.Itens).FirstOrDefaultAsync(o => o.Id == id);
 
         if (order == null)
         {
             return ServiceResult<object>.Fail("Pedido nao encontrado.");
         }
 
+        if (status == "cancelled" && order.PaymentStatus == "paid")
+            return ServiceResult<object>.Fail("Use o reembolso para encerrar um pedido pago.");
+        if (status is "processing" or "completed" && order.PaymentStatus != "paid")
+            return ServiceResult<object>.Fail("Somente pedidos pagos podem avancar de situacao.");
+        if (order.PaymentStatus is "cancelled" or "refunded" or "refused" && status != "cancelled")
+            return ServiceResult<object>.Fail("Pedido financeiro encerrado nao pode ser reaberto.");
         var previousStatus = order.Status;
+        if (status == "cancelled" && order.PaymentStatus == "pending")
+        {
+            await ReleaseStockAsync(order);
+            order.PaymentStatus = "cancelled";
+        }
         order.Status = status;
         _auditService.Add(userId, "status_changed", "Order", order.Id, previousStatus, status);
 
         await _context.SaveChangesAsync();
 
+        await transaction.CommitAsync();
         return ServiceResult<object>.Ok(new
         {
             order.Id,

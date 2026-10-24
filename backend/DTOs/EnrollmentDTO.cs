@@ -2,6 +2,7 @@ namespace EquipamentosMedicosApi.DTOs;
 
 public class MyEnrollmentResponse
 {
+    public ParticipationDTO Participation { get; set; } = new();
     public int EnrollmentId { get; set; }
     public int? CourseId { get; set; }
     public int? ClassId { get; set; }

@@ -118,7 +118,7 @@ public class CoursesController : ControllerBase
             classId,
             studentId,
             request.Status,
-            GetUserId());
+            GetUserId(), request.EnrollmentId);
 
         return result.Success
             ? Ok(result.Data)
@@ -138,7 +138,7 @@ public class CoursesController : ControllerBase
             classId,
             studentId,
             request.TargetClassId,
-            GetUserId());
+            GetUserId(), request.EnrollmentId);
 
         return result.Success
             ? Ok(result.Data)

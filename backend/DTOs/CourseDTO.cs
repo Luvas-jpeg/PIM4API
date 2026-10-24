@@ -55,6 +55,7 @@ public class CourseClassRequestDTO
 
 public class EnrollmentStatusRequestDTO
 {
+    public int? EnrollmentId { get; set; }
     public string Status { get; set; } = "active";
 }
 
@@ -152,6 +153,7 @@ public class CourseQuestionOptionRequestDTO
 
 public class TransferEnrollmentRequestDTO
 {
+    public int? EnrollmentId { get; set; }
     public int TargetClassId { get; set; }
 }
 

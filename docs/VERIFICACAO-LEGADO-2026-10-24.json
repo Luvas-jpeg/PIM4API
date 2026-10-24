@@ -1,0 +1,12 @@
+{
+  "productsTable": null,
+  "matchingColumnNames": [
+    {
+      "table_name": "__EFMigrationsHistory",
+      "column_name": "ProductVersion"
+    }
+  ],
+  "classCourseFk": "FOREIGN KEY (\"CourseId\") REFERENCES \"Courses\"(\"Id\") ON DELETE RESTRICT",
+  "duplicateSeatColumn": 0,
+  "invalidSeatCounters": 0
+}

@@ -34,7 +34,7 @@ public class StudentService
     public async Task<StudentDTO?> GetByIdAsync(int id)
     {
         var student = await _context.Students
-            .Include(student => student.Enrollments)
+            .Include(student => student.Enrollments).ThenInclude(e => e.Class)
             .FirstOrDefaultAsync(student => student.Id == id);
 
         return student == null ? null : ToResponse(student);
@@ -63,9 +63,8 @@ public class StudentService
         ApplyRequest(student, request);
 
         _context.Students.Add(student);
-        _auditService.Add(userId, "created", "Student", student.Id, null,
+        await _auditService.AddCreatedAsync(userId, "Student", () => student.Id,
             new { student.Name, student.Email, student.CourseId, student.Status });
-        await _context.SaveChangesAsync();
 
         return ServiceResult<StudentDTO>.Ok(ToResponse(student));
     }
@@ -78,8 +77,9 @@ public class StudentService
             return ServiceResult<StudentDTO>.Fail(validation);
         }
 
+        await using var transaction = await MutationTransaction.BeginAsync(_context);
         var student = await _context.Students
-            .Include(student => student.Enrollments)
+            .Include(student => student.Enrollments).ThenInclude(e => e.Class)
             .FirstOrDefaultAsync(student => student.Id == id);
 
         if (student == null)
@@ -107,9 +107,15 @@ public class StudentService
 
         ApplyRequest(student, request);
 
+        var states = new EnrollmentStateService(_context);
         foreach (var enrollment in student.Enrollments)
         {
-            enrollment.Status = student.Status;
+            var error = await states.ChangeAsync(enrollment, student.Status);
+            if (error != null)
+            {
+                _context.ChangeTracker.Clear();
+                return ServiceResult<StudentDTO>.Fail(error);
+            }
         }
 
         _auditService.Add(userId, "updated", "Student", student.Id, previous,
@@ -125,6 +131,7 @@ public class StudentService
             });
         await _context.SaveChangesAsync();
 
+        await transaction.CommitAsync();
         return ServiceResult<StudentDTO>.Ok(ToResponse(student));
     }
 

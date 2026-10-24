@@ -8,6 +8,8 @@ public class Enrollment
     public int StudentId { get; set; }
     public int OrderId { get; set; }
     public string Status { get; set; } = "active";
+    public DateTime? ParticipationConfirmedAt { get; set; }
+    public DateTime? ParticipationStartDate { get; set; }
     public DateTime EnrolledAt { get; set; } = DateTime.UtcNow;
 
     public CourseClass? Class { get; set; }

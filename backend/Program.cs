@@ -9,6 +9,11 @@ using EquipamentosMedicosApi.Services;
 
 
 var builder = WebApplication.CreateBuilder(args);
+if (!builder.Environment.IsDevelopment())
+{
+    builder.Logging.ClearProviders();
+    builder.Logging.AddJsonConsole(o => o.IncludeScopes = true);
+}
 
 // --- Banco de Dados ---
 var connectionString = DatabaseConfiguration.GetConnectionString(builder.Configuration);
@@ -83,6 +88,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(o => ReverseProxyConfiguration.Configure(o, builder.Configuration));
+builder.Services.AddProblemDetails();
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -94,7 +101,8 @@ builder.Services.AddRateLimiter(options =>
 
         if (path.Equals("/api/Auth/cadastrar", StringComparison.OrdinalIgnoreCase) ||
             path.Equals("/api/Auth/login", StringComparison.OrdinalIgnoreCase) ||
-            path.Equals("/api/Auth/refresh", StringComparison.OrdinalIgnoreCase))
+            path.Equals("/api/Auth/refresh", StringComparison.OrdinalIgnoreCase) ||
+            path.Equals("/api/Auth/revoke", StringComparison.OrdinalIgnoreCase))
         {
             return RateLimitPartition.GetSlidingWindowLimiter(
                 $"auth:{clientKey}",
@@ -160,6 +168,9 @@ builder.Services.AddScoped<EnrollmentService>();
 builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<StudentService>();
 builder.Services.AddHostedService<PendingOrderExpirationService>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<ParticipationService>();
+
 
 var app = builder.Build();
 
@@ -172,6 +183,13 @@ if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Databas
 }
 
 // --- Middleware ---
+app.UseForwardedHeaders();
+app.UseExceptionHandler();
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Request-ID"] = context.TraceIdentifier;
+    await next();
+});
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -197,4 +215,5 @@ app.MapGet("/health", async (AppDbContext db, CancellationToken cancellationToke
     return ready ? Results.Ok(new { status = "healthy" }) : Results.StatusCode(503);
 }).AllowAnonymous();
 
+app.MapGet("/health/live", () => Results.Ok(new { status = "alive" })).AllowAnonymous();
 app.Run();

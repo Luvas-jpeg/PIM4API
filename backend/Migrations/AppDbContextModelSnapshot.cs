@@ -287,9 +287,6 @@ namespace backend.Migrations
                         .HasColumnType("text")
                         .HasDefaultValue("scheduled");
 
-                    b.Property<int>("VafasDisponiveis")
-                        .HasColumnType("integer");
-
                     b.HasKey("Id");
 
                     b.HasIndex("CourseId");
@@ -514,6 +511,12 @@ namespace backend.Migrations
                     b.Property<int>("OrderId")
                         .HasColumnType("integer");
 
+                    b.Property<DateTime?>("ParticipationConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ParticipationStartDate")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
@@ -571,6 +574,9 @@ namespace backend.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int?>("PromoCodeId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -587,6 +593,8 @@ namespace backend.Migrations
                         .HasColumnType("numeric");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("PromoCodeId");
 
                     b.HasIndex("UsuarioId", "IdempotencyKey")
                         .IsUnique()
@@ -1143,6 +1151,11 @@ namespace backend.Migrations
 
             modelBuilder.Entity("EquipamentosMedicosApi.Models.Order", b =>
                 {
+                    b.HasOne("EquipamentosMedicosApi.Models.PromoCode", null)
+                        .WithMany()
+                        .HasForeignKey("PromoCodeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("EquipamentosMedicosApi.Models.User", "Usuario")
                         .WithMany("Pedidos")
                         .HasForeignKey("UsuarioId")

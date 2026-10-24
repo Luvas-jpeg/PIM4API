@@ -219,8 +219,7 @@ public class CourseService
         var course = new Course();
         Apply(course, request);
         _context.Courses.Add(course);
-        _auditService.Add(userId, "created", "Course", course.Id, null, new { request.Nome, request.Preco });
-        await _context.SaveChangesAsync();
+        await _auditService.AddCreatedAsync(userId, "Course", () => course.Id, new { request.Nome, request.Preco });
         return ServiceResult<CourseResponseDTO>.Ok(ToResponse(course));
     }
 
@@ -313,23 +312,13 @@ public class CourseService
             return null;
         }
 
-        return await _context.Enrollments
-            .Where(enrollment => enrollment.ClassId == classId)
+        var enrollments = await _context.Enrollments
+            .Where(enrollment => enrollment.ClassId == classId && enrollment.Student != null)
             .Include(enrollment => enrollment.Student)
-            .Where(enrollment => enrollment.Student != null)
+            .Include(enrollment => enrollment.Class)
             .OrderBy(enrollment => enrollment.Student!.Name)
-            .Select(enrollment => new StudentDTO
-            {
-                Id = enrollment.Student!.Id,
-                Name = enrollment.Student.Name,
-                Email = enrollment.Student.Email,
-                Phone = enrollment.Student.Phone,
-                CourseId = enrollment.Student.CourseId,
-                CourseName = enrollment.Student.CourseName,
-                EnrollmentDate = enrollment.Student.EnrollmentDate,
-                Status = enrollment.Status
-            })
             .ToListAsync();
+        return enrollments.Select(enrollment => ToStudentResponse(enrollment).Data!).ToList();
     }
 
     public async Task<ServiceResult<StudentDTO>> UpdateEnrollmentStatusAsync(
@@ -337,7 +326,7 @@ public class CourseService
         int classId,
         int studentId,
         string status,
-        int? userId = null)
+        int? userId = null, int? enrollmentId = null)
     {
         var normalizedStatus = status.Trim().ToLowerInvariant();
         if (normalizedStatus is not ("active" or "completed" or "cancelled"))
@@ -345,12 +334,15 @@ public class CourseService
             return ServiceResult<StudentDTO>.Fail("Status de matricula invalido.");
         }
 
+        await using var transaction = await MutationTransaction.BeginAsync(_context);
+        if (!enrollmentId.HasValue && await _context.Enrollments.CountAsync(e => e.ClassId == classId && e.StudentId == studentId) > 1)
+            return ServiceResult<StudentDTO>.Fail("Informe o identificador da matricula para este aluno.");
         var enrollment = await _context.Enrollments
             .Include(item => item.Student)
             .Include(item => item.Class)
             .FirstOrDefaultAsync(item =>
                 item.ClassId == classId &&
-                item.StudentId == studentId &&
+                item.StudentId == studentId && (!enrollmentId.HasValue || item.Id == enrollmentId.Value) &&
                 item.Class!.CourseId == courseId);
 
         if (enrollment?.Student == null || enrollment.Class == null)
@@ -364,31 +356,12 @@ public class CourseService
             return ToStudentResponse(enrollment);
         }
 
-        if (normalizedStatus == "active" &&
-            (enrollment.Class.Status is "cancelled" or "completed" ||
-             enrollment.Class.AvailableSeats <= 0))
-        {
-            return ServiceResult<StudentDTO>.Fail(
-                "A matricula nao pode ser ativada nesta turma.");
-        }
-
-        if (previousStatus != "cancelled" && normalizedStatus == "cancelled")
-        {
-            enrollment.Class.AvailableSeats = Math.Min(
-                enrollment.Class.Capacity,
-                enrollment.Class.AvailableSeats + 1);
-            enrollment.Class.VafasDisponiveis = enrollment.Class.AvailableSeats;
-        }
-        else if (previousStatus == "cancelled" && normalizedStatus != "cancelled")
-        {
-            enrollment.Class.AvailableSeats--;
-            enrollment.Class.VafasDisponiveis = enrollment.Class.AvailableSeats;
-        }
-
-        enrollment.Status = normalizedStatus;
+        var error = await new EnrollmentStateService(_context).ChangeAsync(enrollment, normalizedStatus);
+        if (error != null) return ServiceResult<StudentDTO>.Fail(error);
         _auditService.Add(userId, "status_changed", "Enrollment", enrollment.Id,
             previousStatus, normalizedStatus);
         await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
         return ToStudentResponse(enrollment);
     }
 
@@ -397,7 +370,7 @@ public class CourseService
         int sourceClassId,
         int studentId,
         int targetClassId,
-        int? userId = null)
+        int? userId = null, int? enrollmentId = null)
     {
         if (sourceClassId == targetClassId)
         {
@@ -405,14 +378,16 @@ public class CourseService
                 "A turma de destino deve ser diferente da turma atual.");
         }
 
-        await using var transaction = await _context.Database.BeginTransactionAsync();
+        await using var transaction = await MutationTransaction.BeginAsync(_context);
 
+        if (!enrollmentId.HasValue && await _context.Enrollments.CountAsync(e => e.ClassId == sourceClassId && e.StudentId == studentId) > 1)
+            return ServiceResult<TransferEnrollmentResponseDTO>.Fail("Informe o identificador da matricula para este aluno.");
         var enrollment = await _context.Enrollments
             .Include(item => item.Student)
             .Include(item => item.Class)
             .FirstOrDefaultAsync(item =>
                 item.ClassId == sourceClassId &&
-                item.StudentId == studentId &&
+                item.StudentId == studentId && (!enrollmentId.HasValue || item.Id == enrollmentId.Value) &&
                 item.Class!.CourseId == courseId);
 
         if (enrollment?.Student == null || enrollment.Class == null)
@@ -438,7 +413,7 @@ public class CourseService
                 "Turma de destino nao encontrada para este curso.");
         }
 
-        if (targetClass.Status is "cancelled" or "completed" || targetClass.AvailableSeats <= 0)
+        if (targetClass.Status != "scheduled" || targetClass.DataRealizacao <= DateTime.UtcNow || targetClass.AvailableSeats <= 0)
         {
             return ServiceResult<TransferEnrollmentResponseDTO>.Fail(
                 "A turma de destino nao possui inscricoes abertas ou vagas disponiveis.");
@@ -460,6 +435,8 @@ public class CourseService
         targetClass.AvailableSeats--;
         targetClass.VafasDisponiveis = targetClass.AvailableSeats;
         enrollment.ClassId = targetClass.Id;
+        enrollment.ParticipationConfirmedAt = null;
+        enrollment.ParticipationStartDate = null;
 
         _auditService.Add(userId, "transferred", "Enrollment", enrollment.Id, previous, new
         {
@@ -536,9 +513,8 @@ public class CourseService
         };
 
         _context.CourseModules.Add(module);
-        _auditService.Add(userId, "created", "CourseModule", module.Id, null,
+        await _auditService.AddCreatedAsync(userId, "CourseModule", () => module.Id,
             new { module.CourseId, module.Title, module.SortOrder });
-        await _context.SaveChangesAsync();
 
         return ServiceResult<CourseModuleResponseDTO>.Ok(ToModuleResponse(module));
     }
@@ -601,9 +577,8 @@ public class CourseService
         lesson.ModuleId = moduleId;
 
         _context.CourseLessons.Add(lesson);
-        _auditService.Add(userId, "created", "CourseLesson", lesson.Id, null,
+        await _auditService.AddCreatedAsync(userId, "CourseLesson", () => lesson.Id,
             new { lesson.ModuleId, lesson.Title, lesson.SortOrder });
-        await _context.SaveChangesAsync();
 
         return ServiceResult<CourseLessonResponseDTO>.Ok(ToLessonResponse(lesson));
     }
@@ -702,9 +677,8 @@ public class CourseService
         assessment.CourseId = courseId;
 
         _context.CourseAssessments.Add(assessment);
-        _auditService.Add(userId, "created", "CourseAssessment", assessment.Id, null,
+        await _auditService.AddCreatedAsync(userId, "CourseAssessment", () => assessment.Id,
             new { assessment.CourseId, assessment.Title, assessment.MinimumScore });
-        await _context.SaveChangesAsync();
 
         return ServiceResult<CourseAssessmentResponseDTO>.Ok(ToAssessmentResponse(assessment));
     }
@@ -765,9 +739,8 @@ public class CourseService
         question.AssessmentId = assessmentId;
 
         _context.CourseQuestions.Add(question);
-        _auditService.Add(userId, "created", "CourseQuestion", question.Id, null,
+        await _auditService.AddCreatedAsync(userId, "CourseQuestion", () => question.Id,
             new { question.AssessmentId, question.Statement, Options = question.Options.Count });
-        await _context.SaveChangesAsync();
 
         return ServiceResult<CourseQuestionResponseDTO>.Ok(ToQuestionResponse(question));
     }
@@ -806,9 +779,8 @@ public class CourseService
         };
 
         _context.CourseClasses.Add(courseClass);
-        _auditService.Add(userId, "created", "CourseClass", courseClass.Id, null,
+        await _auditService.AddCreatedAsync(userId, "CourseClass", () => courseClass.Id,
             new { courseClass.CourseId, courseClass.DataRealizacao, courseClass.Capacity });
-        await _context.SaveChangesAsync();
         return ServiceResult<CourseClassResponseDTO>.Ok(ToClassResponse(courseClass));
     }
 
@@ -824,6 +796,7 @@ public class CourseService
             return ServiceResult<CourseClassResponseDTO>.Fail(validation);
         }
 
+        await using var transaction = await MutationTransaction.BeginAsync(_context);
         var courseClass = await _context.CourseClasses
             .FirstOrDefaultAsync(item => item.Id == classId && item.CourseId == courseId);
 
@@ -847,6 +820,16 @@ public class CourseService
             courseClass.Capacity,
             courseClass.Status
         };
+        if (courseClass.DataRealizacao != ToUtc(request.StartDate) ||
+            (courseClass.Status != "cancelled" && request.Status.Trim().ToLowerInvariant() == "cancelled"))
+        {
+            var confirmations = await _context.Enrollments.Where(e => e.ClassId == classId).ToListAsync();
+            foreach (var enrollment in confirmations)
+            {
+                enrollment.ParticipationConfirmedAt = null;
+                enrollment.ParticipationStartDate = null;
+            }
+        }
         courseClass.DataRealizacao = ToUtc(request.StartDate);
         courseClass.EndDate = request.EndDate.HasValue ? ToUtc(request.EndDate.Value) : null;
         courseClass.Local = request.Local.Trim();
@@ -867,6 +850,7 @@ public class CourseService
             });
 
         await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
         return ServiceResult<CourseClassResponseDTO>.Ok(ToClassResponse(courseClass));
     }
 
@@ -1057,7 +1041,9 @@ public class CourseService
             CourseId = enrollment.Student.CourseId,
             CourseName = enrollment.Student.CourseName,
             EnrollmentDate = enrollment.Student.EnrollmentDate,
-            Status = enrollment.Status
+            Status = enrollment.Status,
+            EnrollmentId = enrollment.Id,
+            Participation = ParticipationService.Describe(enrollment, DateTime.UtcNow)
         });
     }
 

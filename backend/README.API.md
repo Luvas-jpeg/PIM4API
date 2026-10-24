@@ -1,5 +1,10 @@
 # Backend (.NET) - API
 
+> Documentacao principal atualizada: [README do PIM4API](../README.md).
+> Os contratos alvo e orientacoes abaixo sao complementares e podem incluir
+> recursos planejados. Configuracao atual, Docker, testes e pendencias estao
+> no README principal.
+
 API central da plataforma de cursos.
 
 Ela deve atender tres clientes:
@@ -38,3 +43,8 @@ O documento de arquitetura, pendencias e hospedagem esta em:
 ## Observacao importante
 
 O `openapi.yaml` descreve a API alvo para o produto real. Alguns endpoints ainda precisam ser implementados no backend atual.
+
+## Participação e lembretes Android
+
+Confirmar participação, estados da matrícula e envio agendado Firebase estão descritos em
+[Notificações e participação](../docs/NOTIFICACOES-E-PARTICIPACAO.md).

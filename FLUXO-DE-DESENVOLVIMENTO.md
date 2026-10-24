@@ -1,5 +1,195 @@
 # Fluxo de desenvolvimento - Plataforma de cursos
 
+## Correções da auditoria — 24/10/2026
+
+- Regra confirmada: vários cursos no pedido, somente uma vaga por curso para o próprio aluno.
+- Correções e critérios atuais em docs/CORRECOES-AUDITORIA-2026-10-24.md; revisão de 17/10 preservada como histórico.
+- Transações PostgreSQL coordenam pedido/vaga/cupom; reembolso usa turma atual da matrícula.
+- Status geral usa a mesma transição de matrícula; admin envia enrollmentId para dados legados.
+- Migration 20261024135217_HardenEnrollmentAndReservations aplicada com backup e restauração isolada aprovada.
+- Coluna duplicada de vagas removida; Products continua fora do schema e sem clientes ativos.
+- Refresh compartilhado no web/desktop; POST Auth/revoke permite revogar refresh mesmo com JWT expirado.
+- Npm audit completo e produção: zero avisos na consulta atual, relatórios JSON datados em docs.
+- Docker/PostgreSQL em loopback; proxy configurável; CI preparado nos quatro projetos; Git local mobile iniciado.
+- Validação final: API 99, web 56, Flutter 20 e desktop 2 testes aprovados; E2E completo com atraso controlado aprovado. Builds Docker, WPF Release, Flutter web e APK debug aprovados.
+- Gateway real permanece adiado; homologação nativa/URLs públicas/remoto de código dependem de ambiente externo.
+
+## Revisão completa dos quatro projetos — 17/10/2026
+
+- Auditoria em docs/AUDITORIA-COMPLETA-2026-10-17.md.
+- Inventário de rotas, schema real e métodos em docs/INVENTARIO-TECNICO-2026-10-17.md e JSON.
+- 62 operações HTTP, 21 tabelas de domínio mais histórico EF, 168 colunas.
+- Products ausente; CourseClasses.CourseId referencia Courses.
+- Participação validada no web e Flutter web com API/PostgreSQL reais; não altera vagas.
+- API 82 testes; web 52; Flutter 20 aprovados, 1 opcional pulado; analyze sem problemas.
+- APK debug recompilado com notificações locais; Android nativo ainda não homologado.
+- Pendências documentadas: gateway real, integridade/concorrência de vagas, refresh web/desktop, proxy/rate limit e dependências web.
+- npm audit: 30 pacotes afetados completo; omitindo dev, 6 (4 altos, 2 moderados). Triagem e atualização pendentes.
+- Relatório distingue demonstração controlada de venda real e contém critérios de conclusão.
+## Confirmação e notificações locais Android — 17/10/2026
+
+- Decisão final do usuário: sem Firebase; notificação personalizada agendada
+  pelo Android e atualizada ao sincronizar com a API.
+- Site e app mostram contagem até o início e abrem confirmação sete dias antes.
+- Confirmação autenticada por matrícula, persistida e exibida no admin/CSV.
+- Alteração de início, cancelamento e transferência invalidam confirmação.
+- Migration AddParticipationConfirmation adiciona dois campos nullable à
+  matrícula; migration provisória de Firebase foi retirada antes da aplicação.
+- Dependências Firebase, worker e endpoints de dispositivos retirados.
+- Flutter usa flutter_local_notifications/timezone, preferências por conta,
+  atualização no retorno ao app, cancelamento no logout e botão de teste.
+- 82 testes da API, 52 do site e 20 testes locais do Flutter aprovados.
+- Teste opcional LIVE_API não faz parte da suíte normal.
+- Entrega visual da notificação em Android ainda pendente de aparelho/emulador.
+- Regras, operação e limites em docs/NOTIFICACOES-E-PARTICIPACAO.md.
+
+## Prévia Flutter no navegador — 17/10/2026
+
+- Suporte web adicionado ao PIM4Mobile para revisar o aplicativo real em Dart.
+- scripts/Preview-Mobile.ps1 compila em profile e inicia http://localhost:4300.
+- Moldura de celular com tamanhos ajustáveis, rotação e recarregamento.
+- Node.js serve o build e encaminha /api para localhost:5278; escuta apenas
+  em loopback, sem alterar CORS da API ou as exigências HTTPS do release.
+- Login, consulta de cursos/pedidos e atualização do perfil verificados no
+  Chrome com uma conta fictícia e a API real. Restauração da sessão após
+  recarregar e logout também aprovados. Flutter analyze sem problemas.
+- README do mobile atualizado com o comando de inicialização. A prévia web
+  não substitui a validação nativa no Android.
+
+
+## Aplicativo Flutter do aluno - retomada em 17/10/2026
+
+- Projeto PIM4Mobile criado em Flutter 3.47.7/Dart 3.13.5, alvo Android.
+- Escopo confirmado: login, matriculas, detalhes das turmas, pedidos e perfil;
+  cadastro e compra permanecem no site, abertos pelo navegador externo.
+- Cliente usa endpoints reais de Auth, me/courses, me/enrollments e Orders.
+- Tokens persistidos com flutter_secure_storage; refresh compartilhado entre
+  chamadas concorrentes e protecao contra restaurar sessao depois do logout.
+- Interface Material 3 em pt-BR, busca/filtro nas matriculas, estados vazio/
+  carregamento/erro, retry e atualizacao puxando a lista.
+- Perfil permite salvar contato e endereco pelo contrato existente da API.
+- URLs via dart-define API_BASE_URL e WEB_BASE_URL; release exige HTTPS.
+- 10 testes locais aprovados e flutter analyze sem problemas em 17/10.
+  Teste opcional da API real e pulado na suite normal; passou em 12/10,
+  criando somente uma conta ficticia e validando login/consultas/perfil/logout.
+- Flutter, Java 17, SDK Android 36, build-tools e NDK instalados na pasta
+  do usuario. Nenhum aparelho Android conectado no momento da verificacao.
+- Primeiro build encontrou erro Kotlin entre raiz C: do pub cache e D: do
+  projeto. kotlin.incremental=false aplicado em android/gradle.properties.
+- APK debug gerado e assinatura v2 verificada em 17/10/2026: pacote br.com.medishop.pim4_aluno, versao 1.0.0+1, Android minimo 24 e alvo 36, com ARM64/ARMv7/x86_64.
+- README mobile e script scripts/Build-Android.ps1 criados. APK em modo debug,
+  configurado para API http://192.168.100.2:5278 e site na porta 4200.
+- Pendente validar aparelho real, storage nativo, URLs publicas e assinatura
+  de distribuicao. Nao houve implementacao de pagamento nativo ou notificacoes.
+
+## Falha intermitente do E2E corrigida - 12/10/2026
+
+- Ultimo relatorio falhava na verificacao do card apos criar turma: aguardava
+  15 segundos, mas a listagem nao continha mais o curso/turma recem-criados.
+- Reproduzido com resposta real de GET /api/courses atrasada ate depois do
+  POST da turma. A consulta inicial substituia o estado atualizado do admin.
+- Admin registra revisao das atualizacoes locais. Consulta anterior preserva
+  cursos/turmas mais recentes e acrescenta cursos existentes ainda nao carregados.
+- Tres testes de regressao cobrem carga normal, resposta atrasada apos curso/
+  turma e recuperacao de cursos existentes sem apagar o cadastro novo.
+- 48 testes frontend aprovados. Build Docker aprovado e container atualizado.
+- E2E completo aprovado na versao final com atraso controlado (4,7 s de cenario,
+  5,8 s no runner), incluindo pedido, assinatura, pagamento e matricula.
+- npm run test:e2e -- -DelayInitialCourses verifica essa regressao; opcao usa
+  dados reais da API, sem mocks. Execucao padrao nao atrasa respostas.
+- Terminal exibe etapas [E2E]. Cadastro do aluno verifica resposta HTTP antes
+  de aguardar login; HTTP 429 deixa de parecer uma espera por login inexistente.
+- Rate limiting da API preservado. README orienta aguardar a janela quando
+  execucoes consecutivas atingirem o limite.
+- READMEs atualizados; pagamento externo e deploy continuam pendentes.
+
+## README do desktop atualizado - 11/10/2026
+
+- PIM4Desktop/README.md documenta funcionalidades WPF atuais, requisitos
+  Windows/.NET 10, conexao local e remota, JWT/refresh, build e distribuicao.
+- Explica prioridade de PIM4_API_BASE_URL sobre appsettings.json, URL raiz
+  sem /api e configuracao ao lado do executavel publicado.
+- Distingue consultas/cadastros disponiveis das acoes mais completas no web.
+- Registra ausencia de testes automatizados WPF e pendencias de distribuicao.
+- Campo de inicio da turma no desktop possui data sem horario especifico;
+  validacao desse comportamento permanece pendente antes da entrega final.
+- Nenhuma alteracao funcional ou execucao do E2E nesta etapa.
+
+## Documentacao de entrada e estado do E2E - 11/10/2026
+
+- README.md principal criado no PIM4API e README.md do PIM4Front substituido
+  pela documentacao atual de arquitetura, instalacao, configuracao, execucao,
+  testes, regras de negocio, publicacao e pendencias.
+- API inclui banco/migrations, autenticacao, endpoints, webhook de teste,
+  limites dos containers, backup e verificacao de restauracao.
+- Front inclui proxy /api, rotas, desenvolvimento com Docker ou npm,
+  estrutura, build e requisitos de hospedagem.
+- Usuario relatou travamento atual no E2E. Execucoes aprovadas em 09/10
+  permanecem como historico, nao como prova de que a falha atual foi resolvida.
+- Investigacao do travamento adiada a pedido do usuario; nenhuma correcao
+  ou nova execucao do E2E nesta etapa.
+- Pagamento real, deploy validado e Android continuam pendentes.
+- Lembretes aos alunos antes do curso permanecem melhoria futura.
+
+## Teste pratico automatizado do site - 09/10/2026
+
+- PIM4Front possui Playwright e comando npm run test:e2e.
+- scripts/Test-LocalEnrollmentFlow.ps1 solicita administrador local e senha
+  oculta; le a chave do webhook no .env local do PIM4API sem exibi-la.
+- Usa Chrome, frontend, API e PostgreSQL reais, sem mocks de respostas.
+- Pelo navegador: admin cria curso/turma futura; aluno se cadastra, busca
+  curso, seleciona turma e cria pedido Pix pelo carrinho/checkout.
+- Verifica pedido pending sem matricula, rejeicao HTTP 401 de assinatura
+  invalida, pagamento local assinado, repeticao idempotente e uma vaga usada.
+- Confirma pagamento paid, uma matricula active para CourseId/ClassId/OrderId
+  corretos, acesso aos detalhes e retorno para /area-aluno.
+- Aceita somente frontend local. Nao faz cobranca nem valida gateway real.
+- Curso TESTE E2E e arquivado ao finalizar; historico ficticio fica no banco.
+- npm run test:e2e:report abre relatorio com IDs e screenshot. Instrucoes em
+  PIM4Front/e2e/README.md. Relatorios ignorados pelo Git e pelo Docker.
+- Fluxo completo aprovado em duas execucoes (5,9 s e 5,1 s no runner);
+  45 testes existentes tambem aprovados.
+- Android, desktop, reembolso, cancelamento e concorrencia nao sao cobertos
+  por este cenario. Integracao do provedor requer testes de sandbox proprios.
+
+## Espacamento do retorno da area do aluno - 09/10/2026
+
+- Links de retorno com navigation-button ficam em uma linha propria, com
+  largura do conteudo limitada a tela. O texto Area do aluno aparece abaixo.
+- Regra compartilhada tambem atende conta e detalhes do pedido.
+- Chrome em 1280 e 390 px: 20 px entre botao e texto, botao com altura
+  minima de 44 px e sem overflow no cenario verificado.
+
+## Listagem de Turmas reorganizada - 08/10/2026
+
+- Correcao anterior dos formularios nao resolvia a listagem com varios cursos.
+- Cada curso agora ocupa um bloco de largura inteira, com nome e acao
+  Adicionar turma no cabecalho. Suas turmas usam uma grade interna responsiva.
+- Cards exibem numero da turma, status, inicio, local, instrutor e vagas;
+  o nome do curso aparece apenas no cabecalho, evitando repeticao e altura
+  excessiva. Textos longos quebram dentro do bloco.
+- Chrome com dados ficticios: quatro cursos, zero/uma/tres turmas e nome
+  extenso sem espacos, em 1280, 900 e 390 px. Sem overflow horizontal ou
+  erros de pagina. Adicionar, editar e abrir alunos continuam funcionando.
+- 45 testes frontend aprovados.
+
+## Ajustes visuais do admin e aluno - 08/10/2026
+
+- Estilos de formulario e listas do admin organizados em admin-layout.scss.
+- Campos alinhados ao topo; o aviso de inicio nao estica campos vizinhos.
+- Modal possui coluna com minmax(0, 1fr), largura limitada e quebra de textos
+  longos; nomes de curso nao aumentam a largura interna do formulario.
+- Alunos usam quatro colunas no desktop e reorganizacao responsiva; nomes,
+  emails e cursos longos quebram sem transbordar. Detalhes tambem corrigidos.
+- Campos R$/% usam prefixo fixo, input sem borda interna e foco visivel.
+- Retornos e atalhos de conta/pedido na area do aluno possuem estilo de botao,
+  preservando links de navegacao e acesso pelo teclado.
+- Chrome headless com dados ficticios: verificados turma, alunos, modal do
+  aluno, preco, desconto percentual e retorno da matricula em 1280 e 390 px.
+- Confirmado alinhamento inicio/fim e ausencia de overflow horizontal nos
+  casos verificados. Antes havia desalinhamento de 12,5 px e overflow.
+- 45 testes frontend aprovados apos os ajustes.
+
 ## Area do aluno dedicada no site - 08/10/2026
 
 - Nova pagina Angular protegida em /area-aluno, consumindo GET /api/me/courses.

@@ -2,6 +2,8 @@ namespace EquipamentosMedicosApi.DTOs
 {
     public class StudentDTO
     {
+        public ParticipationDTO? Participation { get; set; }
+        public int? EnrollmentId { get; set; }
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;

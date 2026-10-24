@@ -176,14 +176,14 @@ public sealed class CourseDomainTests
         var service = new InventoryService(fixture.Context);
         var result = await service.ValidateAndReserveAsync(new List<CreateOrderItemDTO>
         {
-            new() { CourseId = course.Id, TurmaId = courseClass.Id, Quantidade = 2 }
+            new() { CourseId = course.Id, TurmaId = courseClass.Id, Quantidade = 1 }
         });
 
         Assert.True(result.Success);
         await fixture.Context.Entry(courseClass).ReloadAsync();
         var persistedClass = await fixture.Context.CourseClasses.SingleAsync();
-        Assert.Equal(3, persistedClass.AvailableSeats);
-        Assert.Equal(3, persistedClass.VafasDisponiveis);
+        Assert.Equal(4, persistedClass.AvailableSeats);
+        Assert.Equal(4, persistedClass.VafasDisponiveis);
     }
 
     [Fact]
@@ -223,7 +223,7 @@ public sealed class CourseDomainTests
 
         var result = await new InventoryService(fixture.Context).ValidateAndReserveAsync(new List<CreateOrderItemDTO>
         {
-            new() { CourseId = course.Id, Quantidade = 2 }
+            new() { CourseId = course.Id, Quantidade = 1 }
         });
 
         Assert.True(result.Success);
@@ -602,7 +602,7 @@ public sealed class CourseDomainTests
         });
 
         Assert.False(result.Success);
-        Assert.Contains("quantidade maxima", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("uma vaga", result.Error, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

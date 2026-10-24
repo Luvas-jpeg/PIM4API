@@ -64,16 +64,24 @@ namespace EquipamentosMedicosApi.Controllers
             return Ok(result.Data);
         }
 
+        [HttpPost("revoke")]
+        [AllowAnonymous]
+        public async Task<IActionResult> Revoke([FromBody] LogoutRequestDTO request)
+        {
+            await _authService.RevokeRefreshAsync(request.RefreshToken);
+            return NoContent(); // Identical response for unknown/already revoked tokens.
+        }
+
         [HttpPost("logout")]
         [Authorize]
-        public async Task<IActionResult> Logout()
+        public async Task<IActionResult> Logout([FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] LogoutRequestDTO? request = null)
         {
             var userId = GetAuthenticatedUserId();
 
             if (userId == null)
                 return Unauthorized();
 
-            await _authService.LogoutAsync(userId.Value);
+            await _authService.LogoutAsync(userId.Value, request?.RefreshToken);
 
             return NoContent();
         }

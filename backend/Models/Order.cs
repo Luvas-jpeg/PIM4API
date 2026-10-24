@@ -12,6 +12,7 @@ namespace EquipamentosMedicosApi.Models
         public decimal ValorFrete { get; set; }
         public string PaymentMethod { get; set; } = "credit_card";
         public int? Installments { get; set; }
+        public int? PromoCodeId { get; set; }
         public string PromoCode { get; set; } = string.Empty;
         public string? GatewayPaymentId { get; set; }
         public DateTime? PaidAt { get; set; }

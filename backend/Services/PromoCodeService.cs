@@ -54,6 +54,7 @@ public class PromoCodeService
 
     public async Task<ServiceResult<PromoCodeDTO>> CreateAsync(PromoCodeRequestDTO request)
     {
+        await using var transaction = await MutationTransaction.BeginAsync(_context);
         var validation = ValidateRequest(request);
         if (validation != null)
         {
@@ -74,11 +75,13 @@ public class PromoCodeService
         _context.PromoCodes.Add(promoCode);
         await _context.SaveChangesAsync();
 
+        await transaction.CommitAsync();
         return ServiceResult<PromoCodeDTO>.Ok(ToResponse(promoCode));
     }
 
     public async Task<ServiceResult<PromoCodeDTO>> UpdateAsync(int id, PromoCodeRequestDTO request)
     {
+        await using var transaction = await MutationTransaction.BeginAsync(_context);
         var validation = ValidateRequest(request);
         if (validation != null)
         {
@@ -101,13 +104,17 @@ public class PromoCodeService
             return ServiceResult<PromoCodeDTO>.Fail("Codigo promocional ja cadastrado.");
         }
 
+        var usageCount = promoCode.UsageCount;
         ApplyRequest(promoCode, request);
+        promoCode.UsageCount = usageCount; // Browser snapshots cannot overwrite live reservations.
         await _context.SaveChangesAsync();
 
+        await transaction.CommitAsync();
         return ServiceResult<PromoCodeDTO>.Ok(ToResponse(promoCode));
     }
     public async Task<bool> DeleteAsync(int id)
     {
+        await using var transaction = await MutationTransaction.BeginAsync(_context);
         var promoCode = await _context.PromoCodes.FirstOrDefaultAsync(promoCode => promoCode.Id == id);
 
         if (promoCode == null)
@@ -115,9 +122,11 @@ public class PromoCodeService
             return false;
         }
 
+        if (await _context.Orders.AnyAsync(o => o.PromoCodeId == id)) return false;
         _context.PromoCodes.Remove(promoCode);
         await _context.SaveChangesAsync();
 
+        await transaction.CommitAsync();
         return true;
     }
 

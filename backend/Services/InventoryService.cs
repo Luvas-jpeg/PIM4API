@@ -7,7 +7,7 @@ namespace EquipamentosMedicosApi.Services;
 
 public class InventoryService(AppDbContext context)
 {
-    public const int MaxCourseQuantityPerOrder = 5;
+    public const int MaxCourseQuantityPerOrder = 1;
 
     public async Task<ServiceResult<Dictionary<int, Course>>> ValidateAndReserveAsync(List<CreateOrderItemDTO> items)
     {
@@ -20,7 +20,7 @@ public class InventoryService(AppDbContext context)
                 return ServiceResult<Dictionary<int, Course>>.Fail("Quantidade deve ser maior que zero.");
             if (group.Sum(item => (long)item.Quantidade) > MaxCourseQuantityPerOrder)
                 return ServiceResult<Dictionary<int, Course>>.Fail(
-                    $"A quantidade maxima por pedido para cursos e {MaxCourseQuantityPerOrder} inscricoes.");
+                    "Cada aluno pode comprar somente uma vaga por curso no pedido.");
             if (group.Select(item => item.TurmaId).Distinct().Count() > 1)
                 return ServiceResult<Dictionary<int, Course>>.Fail("Selecione apenas uma turma por curso no pedido.");
         }
@@ -65,9 +65,9 @@ public class InventoryService(AppDbContext context)
                     candidate.DataRealizacao >= now && candidate.AvailableSeats >= item.Quantidade)
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(candidate => candidate.AvailableSeats,
-                        candidate => candidate.AvailableSeats - item.Quantidade)
-                    .SetProperty(candidate => candidate.VafasDisponiveis,
-                        candidate => candidate.VafasDisponiveis - item.Quantidade));
+                        candidate => candidate.AvailableSeats - item.Quantidade));
+            var tracked = context.ChangeTracker.Entries<CourseClass>().FirstOrDefault(e => e.Entity.Id == item.TurmaId.Value);
+            if (tracked != null) await tracked.ReloadAsync();
             if (reserved == 0)
                 return ServiceResult<Dictionary<int, Course>>.Fail(
                     $"Vagas insuficientes na turma selecionada para {course.Nome}.");

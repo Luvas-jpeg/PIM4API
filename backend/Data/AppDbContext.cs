@@ -31,8 +31,8 @@ namespace EquipamentosMedicosApi.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            base.OnModelCreating(modelBuilder);
 
+            base.OnModelCreating(modelBuilder);
             modelBuilder.Entity<Order>()
                 .Property(order => order.Status)
                 .HasDefaultValue("pending");
@@ -262,12 +262,19 @@ namespace EquipamentosMedicosApi.Data
                 new PromoCode { Id = 2, Code = "PRIMEIRACOMPRA", Discount = 50m, DiscountType = "fixed", StartDate = "2026-01-01", EndDate = "2026-12-31", IsActive = true, UsageCount = 12 }
             );
 
-            // Optional: set up JSON mapping for CourseProgress.CompletedLessons
+            // Persist mutations to the list, not only replacement of its reference.
             modelBuilder.Entity<CourseProgress>().Property(p => p.CompletedLessons)
                 .HasConversion(
                     v => System.Text.Json.JsonSerializer.Serialize<List<int>>(v, (System.Text.Json.JsonSerializerOptions?)null),
                     v => System.Text.Json.JsonSerializer.Deserialize<List<int>>(v, (System.Text.Json.JsonSerializerOptions?)null) ?? new List<int>()
                 );
+            modelBuilder.Entity<CourseProgress>().Property(p => p.CompletedLessons)
+                .Metadata.SetValueComparer(new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<List<int>>(
+                    (a, b) => a != null && b != null && a.SequenceEqual(b),
+                    v => v.Aggregate(0, (hash, item) => HashCode.Combine(hash, item)),
+                    v => v.ToList()));
+            modelBuilder.Entity<Order>().HasOne<PromoCode>().WithMany()
+                .HasForeignKey(o => o.PromoCodeId).OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

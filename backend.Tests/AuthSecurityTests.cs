@@ -13,6 +13,30 @@ namespace backend.Tests;
 public sealed class AuthSecurityTests
 {
     [Fact]
+    public async Task RefreshCredentialCanBeRevokedWithoutAccessTokenAndWithoutAffectingAnotherSession()
+    {
+        await using var fixture=await TestFixture.CreateAsync();
+        await fixture.AddRefreshTokenAsync(Hash("old-access-session"));
+        await fixture.AddRefreshTokenAsync(Hash("another-session"));
+        await fixture.CreateService().RevokeRefreshAsync("unknown");
+        await fixture.CreateService().RevokeRefreshAsync("old-access-session");
+        Assert.False((await fixture.CreateService().RefreshAsync("old-access-session")).Success);
+        Assert.True((await fixture.CreateService().RefreshAsync("another-session")).Success);
+    }
+
+    [Fact]
+    public async Task LogoutWithRefreshTokenRevokesOnlyThatSession()
+    {
+        await using var fixture=await TestFixture.CreateAsync();
+        await fixture.AddRefreshTokenAsync(Hash("session-one"));
+        await fixture.AddRefreshTokenAsync(Hash("session-two"));
+        var userId=await fixture.Context.Users.Select(u=>u.ID).SingleAsync();
+        await fixture.CreateService().LogoutAsync(userId,"session-one");
+        Assert.False((await fixture.CreateService().RefreshAsync("session-one")).Success);
+        Assert.True((await fixture.CreateService().RefreshAsync("session-two")).Success);
+    }
+
+    [Fact]
     public async Task RefreshRotatesHashedTokenAndRejectsReuse()
     {
         await using var fixture = await TestFixture.CreateAsync();

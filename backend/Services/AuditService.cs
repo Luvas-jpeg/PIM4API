@@ -32,6 +32,16 @@ public class AuditService
         });
     }
 
+    public async Task AddCreatedAsync(int? userId, string entityType, Func<object> entityId, object newValue)
+    {
+        var ownsTransaction = _context.Database.CurrentTransaction == null;
+        await using var transaction = ownsTransaction ? await MutationTransaction.BeginAsync(_context) : null;
+        await _context.SaveChangesAsync();
+        Add(userId, "created", entityType, entityId(), null, newValue);
+        await _context.SaveChangesAsync();
+        if (transaction != null) await transaction.CommitAsync();
+    }
+
     private static string? Serialize(object? value)
         => value == null ? null : JsonSerializer.Serialize(value);
 }

@@ -197,9 +197,21 @@ public class AuthService
             User = ToResponse(token.User)
         });
     }
-    public async Task<bool> LogoutAsync(int userId)
+    // Possession of the opaque refresh token authenticates revocation of that
+    // token only. No user identifier or valid access JWT is required.
+    public async Task RevokeRefreshAsync(string? refreshToken)
     {
-        var tokens = await _context.RefreshTokens.Where(rt => rt.UserId == userId && rt.RevokedAt == null).ToListAsync();
+        if (string.IsNullOrWhiteSpace(refreshToken) || refreshToken.Length > 512) return;
+        var hash = HashToken(refreshToken);
+        await _context.RefreshTokens.Where(t => t.RevokedAt == null && (t.Token == hash || t.Token == refreshToken))
+            .ExecuteUpdateAsync(setters => setters.SetProperty(t => t.RevokedAt, DateTime.UtcNow));
+    }
+
+    public async Task<bool> LogoutAsync(int userId, string? refreshToken = null)
+    {
+        var hash = string.IsNullOrWhiteSpace(refreshToken) ? null : HashToken(refreshToken);
+        var tokens = await _context.RefreshTokens.Where(rt => rt.UserId == userId && rt.RevokedAt == null &&
+            (hash == null || rt.Token == hash || rt.Token == refreshToken)).ToListAsync();
 
         foreach (var t in tokens)
             t.RevokedAt = DateTime.UtcNow;

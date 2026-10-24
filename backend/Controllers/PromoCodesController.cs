@@ -102,7 +102,9 @@ namespace EquipamentosMedicosApi.Controllers
 
             if (!deleted)
             {
-                return NotFound(new { message = "Codigo promocional nao encontrado." });
+                return await _promoCodeService.GetByIdAsync(id) == null
+                    ? NotFound(new { message = "Codigo promocional nao encontrado." })
+                    : Conflict(new { message = "Cupom utilizado em pedidos nao pode ser excluido. Desative o cupom." });
             }
 
             return NoContent();

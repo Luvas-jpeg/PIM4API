@@ -8,7 +8,8 @@ public class CourseClass
     public DateTime? EndDate { get; set; }
     public string Local { get; set; } = string.Empty;
     public string Instructor { get; set; } = string.Empty;
-    public int VafasDisponiveis { get; set; }
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public int VafasDisponiveis { get => AvailableSeats; set => AvailableSeats = value; }
     public int Capacity { get; set; }
     public int AvailableSeats { get; set; }
     public string Status { get; set; } = "scheduled";

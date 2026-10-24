@@ -327,7 +327,7 @@ public sealed class OrderPaymentFlowTests
         Assert.Equal("pending", (await fixture.Context.Orders.SingleAsync(o => o.Id == second.Data.OrderId)).PaymentStatus);
     }
 
-    private static CreateOrderDTO CreateRequest()
+    internal static CreateOrderDTO CreateRequest()
     {
         return new CreateOrderDTO
         {
@@ -339,7 +339,7 @@ public sealed class OrderPaymentFlowTests
         };
     }
 
-    private sealed class TestFixture : IAsyncDisposable
+    internal sealed class TestFixture : IAsyncDisposable
     {
         private readonly DbConnection _connection;
         public AppDbContext Context { get; }

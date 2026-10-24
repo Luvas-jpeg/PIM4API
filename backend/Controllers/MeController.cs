@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using EquipamentosMedicosApi.Data;
 using Microsoft.EntityFrameworkCore;
 using EquipamentosMedicosApi.DTOs;
+using EquipamentosMedicosApi.Services;
 
 namespace EquipamentosMedicosApi.Controllers
 {
@@ -59,6 +60,7 @@ namespace EquipamentosMedicosApi.Controllers
 
                 return new MyEnrollmentResponse
                 {
+                    Participation = ParticipationService.Describe(e, DateTime.UtcNow),
                     EnrollmentId = e.Id,
                     CourseId = course?.Id,
                     ClassId = e.ClassId,
@@ -82,7 +84,26 @@ namespace EquipamentosMedicosApi.Controllers
             return Ok(courses);
         }
 
+
+        [HttpPost("enrollments/{enrollmentId:int}/participation")]
+        public async Task<IActionResult> ConfirmParticipation(int enrollmentId,
+            [FromServices] ParticipationService participation)
+        {
+            var userId = GetAuthenticatedUserId();
+            if (userId == null) return Unauthorized();
+            try
+            {
+                var result = await participation.ConfirmAsync(enrollmentId, userId.Value);
+                return result == null ? NotFound(new { message = "Matricula nao encontrada." }) : Ok(result);
+            }
+            catch (InvalidOperationException error)
+            {
+                return Conflict(new { message = error.Message });
+            }
+        }
+
         [HttpGet("courses/{courseId}/progress")]
+
         public async Task<IActionResult> GetProgress(int courseId)
         {
             var userId = GetAuthenticatedUserId();
@@ -148,6 +169,7 @@ namespace EquipamentosMedicosApi.Controllers
 
             return Ok(new MyEnrollmentResponse
             {
+                Participation = ParticipationService.Describe(enrollment, DateTime.UtcNow),
                 EnrollmentId = enrollment.Id,
                 CourseId = course?.Id,
                 ClassId = enrollment.ClassId,
