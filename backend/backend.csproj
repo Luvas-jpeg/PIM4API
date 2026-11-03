@@ -7,14 +7,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-<<<<<<< Updated upstream
+    <PackageReference Include="Microsoft.ML" Version="5.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.14" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.14">
-=======
-    <PackageReference Include="Microsoft.ML" Version="5.0.1" />
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11">
->>>>>>> Stashed changes
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
