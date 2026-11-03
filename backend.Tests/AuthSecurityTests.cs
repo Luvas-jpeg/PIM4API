@@ -78,6 +78,52 @@ public sealed class AuthSecurityTests
         Assert.NotNull(oldToken.RevokedAt);
     }
 
+    [Fact]
+    public async Task RegistrationNormalizesFormattedProfileValues()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var result = await fixture.CreateService().RegisterAsync(new EquipamentosMedicosApi.DTOs.RegistroDTO
+        {
+            Nome = " Novo Aluno ", Email = " NOVO@EXAMPLE.COM ", Senha = "SenhaSegura123",
+            Cpf = "529.982.247-25", Phone = "+55 (11) 99999-9999"
+        });
+        Assert.True(result.Success, result.Error);
+        var user = await fixture.Context.Users.SingleAsync(u => u.Email == "novo@example.com");
+        Assert.Equal("Novo Aluno", user.Nome);
+        Assert.Equal("52998224725", user.Cpf);
+        Assert.Equal("11999999999", user.Phone);
+    }
+
+    [Theory]
+    [InlineData("cpf")]
+    [InlineData("phone")]
+    [InlineData("state")]
+    [InlineData("zipCode")]
+    [InlineData("nome")]
+    public async Task InvalidProfileDoesNotChangeSavedUser(string field)
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var request = new EquipamentosMedicosApi.DTOs.UpdateProfileDTO
+        {
+            Nome = "Nome Alterado", Email = "novo@example.com", Cpf = "52998224725",
+            Phone = "11999999999", State = "SP", ZipCode = "01001000"
+        };
+        switch (field)
+        {
+            case "cpf": request.Cpf = "11111111111"; break;
+            case "phone": request.Phone = "abcdefghij"; break;
+            case "state": request.State = "ZZ"; break;
+            case "zipCode": request.ZipCode = "abcdefgh"; break;
+            case "nome": request.Nome = "   "; break;
+        }
+        var user = await fixture.Context.Users.SingleAsync();
+        var result = await fixture.CreateService().UpdateProfileAsync(user.ID, request);
+        Assert.False(result.Success);
+        await fixture.Context.Entry(user).ReloadAsync();
+        Assert.Equal("Aluno Teste", user.Nome);
+        Assert.Equal("auth.security@example.com", user.Email);
+    }
+
     private static string Hash(string value)
     {
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));

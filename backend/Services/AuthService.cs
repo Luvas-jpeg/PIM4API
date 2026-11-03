@@ -5,6 +5,7 @@ using System.Text;
 using EquipamentosMedicosApi.Data;
 using EquipamentosMedicosApi.DTOs;
 using EquipamentosMedicosApi.Models;
+using EquipamentosMedicosApi.Validation;
 
 namespace EquipamentosMedicosApi.Services;
 
@@ -24,15 +25,15 @@ public class AuthService
 
     public async Task<AuthServiceResult<int>> RegisterAsync(RegistroDTO request)
     {
-        if (string.IsNullOrWhiteSpace(request.Nome) || request.Nome.Length > 120 ||
-            string.IsNullOrWhiteSpace(request.Email) || request.Email.Length > 254 ||
-            string.IsNullOrWhiteSpace(request.Cpf) || request.Cpf.Length > 14 ||
-            string.IsNullOrWhiteSpace(request.Phone) || request.Phone.Length > 20)
+        if (string.IsNullOrWhiteSpace(request.Nome) || (request.Nome.Trim().Length < 3 || request.Nome.Trim().Length > 120) ||
+            string.IsNullOrWhiteSpace(request.Email) || request.Email.Trim().Length > 254 ||
+            string.IsNullOrWhiteSpace(request.Cpf) || request.Cpf.Trim().Length > 14 ||
+            string.IsNullOrWhiteSpace(request.Phone) || request.Phone.Trim().Length > 20)
         {
             return AuthServiceResult<int>.Fail("Confira os dados informados e tente novamente.");
         }
 
-        var email = request.Email.Trim().ToLower();
+        var email = request.Email.Trim().ToLowerInvariant();
         if (!IsValidEmail(email))
         {
             return AuthServiceResult<int>.Fail("E-mail invalido.");
@@ -45,7 +46,12 @@ public class AuthService
             return AuthServiceResult<int>.Fail("E-mail já cadastrado.");
         }
 
-        if (!IsValidCpf(request.Cpf))
+        if (!ProfileValidation.IsValidPhone(request.Phone))
+        {
+            return AuthServiceResult<int>.Fail("Informe telefone fixo ou celular valido com DDD.");
+        }
+
+        if (!ProfileValidation.IsValidCpf(request.Cpf))
         {
             return AuthServiceResult<int>.Fail("CPF inválido.");
         }
@@ -60,8 +66,8 @@ public class AuthService
         {
             Nome = request.Nome.Trim(),
             Email = email,
-            Cpf = request.Cpf.Trim(),
-            Phone = request.Phone.Trim(),
+            Cpf = ProfileValidation.Digits(request.Cpf),
+            Phone = ProfileValidation.NormalizePhone(request.Phone),
             SenhaHash = BCrypt.Net.BCrypt.HashPassword(request.Senha),
             Role = "Cliente"
         };
@@ -74,13 +80,13 @@ public class AuthService
 
     public async Task<AuthServiceResult<LoginResponse>> LoginAsync(LoginDTO request)
     {
-        if (string.IsNullOrWhiteSpace(request.Email) || request.Email.Length > 254 ||
+        if (string.IsNullOrWhiteSpace(request.Email) || request.Email.Trim().Length > 254 ||
             string.IsNullOrWhiteSpace(request.Senha) || request.Senha.Length > 128)
         {
             return AuthServiceResult<LoginResponse>.Fail("E-mail ou senha invÃ¡lidos.");
         }
 
-        var email = request.Email.Trim().ToLower();
+        var email = request.Email.Trim().ToLowerInvariant();
         if (!IsValidEmail(email))
         {
             return AuthServiceResult<LoginResponse>.Fail("E-mail ou senha invÃ¡lidos.");
@@ -236,17 +242,22 @@ public class AuthService
 
     public async Task<AuthServiceResult<UserResponseDTO>> UpdateProfileAsync(int userId, UpdateProfileDTO request)
     {
-        if (string.IsNullOrWhiteSpace(request.Nome) || request.Nome.Length > 120 ||
-            string.IsNullOrWhiteSpace(request.Email) || request.Email.Length > 254 ||
-            string.IsNullOrWhiteSpace(request.Cpf) || request.Cpf.Length > 14 ||
-            string.IsNullOrWhiteSpace(request.Phone) || request.Phone.Length > 20 ||
-            (request.Street?.Length ?? 0) > 160 || (request.Number?.Length ?? 0) > 20 ||
-            (request.Complement?.Length ?? 0) > 120 || (request.Neighborhood?.Length ?? 0) > 120 ||
-            (request.City?.Length ?? 0) > 120 || (request.State?.Length ?? 0) > 2 ||
-            (request.ZipCode?.Length ?? 0) > 10)
+        if (string.IsNullOrWhiteSpace(request.Nome) || (request.Nome.Trim().Length < 3 || request.Nome.Trim().Length > 120) ||
+            string.IsNullOrWhiteSpace(request.Email) || request.Email.Trim().Length > 254 ||
+            string.IsNullOrWhiteSpace(request.Cpf) || request.Cpf.Trim().Length > 14 ||
+            string.IsNullOrWhiteSpace(request.Phone) || request.Phone.Trim().Length > 20 ||
+            (request.Street?.Trim().Length ?? 0) > 160 || (request.Number?.Trim().Length ?? 0) > 20 ||
+            (request.Complement?.Trim().Length ?? 0) > 120 || (request.Neighborhood?.Trim().Length ?? 0) > 120 ||
+            (request.City?.Trim().Length ?? 0) > 120 || (request.State?.Trim().Length ?? 0) > 2 ||
+            (request.ZipCode?.Trim().Length ?? 0) > 10)
         {
             return AuthServiceResult<UserResponseDTO>.Fail("Confira os dados informados e tente novamente.");
         }
+
+        if (!ProfileValidation.IsValidState(request.State))
+            return AuthServiceResult<UserResponseDTO>.Fail("Informe uma UF valida, por exemplo SP.");
+        if (!ProfileValidation.IsValidZipCode(request.ZipCode))
+            return AuthServiceResult<UserResponseDTO>.Fail("Informe um CEP com 8 digitos.");
 
         var user = await _context.Users.FirstOrDefaultAsync(user => user.ID == userId);
 
@@ -255,7 +266,7 @@ public class AuthService
             return AuthServiceResult<UserResponseDTO>.Fail("Usuário não encontrado.");
         }
 
-        var email = request.Email.Trim().ToLower();
+        var email = request.Email.Trim().ToLowerInvariant();
         if (!IsValidEmail(email))
         {
             return AuthServiceResult<UserResponseDTO>.Fail("E-mail invalido.");
@@ -266,7 +277,12 @@ public class AuthService
             return AuthServiceResult<UserResponseDTO>.Fail("Nome e e-mail são obrigatórios.");
         }
 
-        if (!IsValidCpf(request.Cpf))
+        if (!ProfileValidation.IsValidPhone(request.Phone))
+        {
+            return AuthServiceResult<UserResponseDTO>.Fail("Informe telefone fixo ou celular valido com DDD.");
+        }
+
+        if (!ProfileValidation.IsValidCpf(request.Cpf))
         {
             return AuthServiceResult<UserResponseDTO>.Fail("CPF inválido.");
         }
@@ -281,15 +297,15 @@ public class AuthService
 
         user.Nome = request.Nome.Trim();
         user.Email = email;
-        user.Cpf = request.Cpf.Trim();
-        user.Phone = request.Phone.Trim();
+        user.Cpf = ProfileValidation.Digits(request.Cpf);
+        user.Phone = ProfileValidation.NormalizePhone(request.Phone);
         user.Street = request.Street?.Trim() ?? string.Empty;
         user.Number = request.Number?.Trim() ?? string.Empty;
         user.Complement = request.Complement?.Trim() ?? string.Empty;
         user.Neighborhood = request.Neighborhood?.Trim() ?? string.Empty;
         user.City = request.City?.Trim() ?? string.Empty;
-        user.State = request.State?.Trim() ?? string.Empty;
-        user.ZipCode = request.ZipCode?.Trim() ?? string.Empty;
+        user.State = request.State?.Trim().ToUpperInvariant() ?? string.Empty;
+        user.ZipCode = ProfileValidation.Digits(request.ZipCode ?? string.Empty);
 
         await _context.SaveChangesAsync();
 
@@ -328,33 +344,4 @@ public class AuthService
                string.Equals(parsed.Address, email, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool IsValidCpf(string cpf)
-    {
-        var digits = new string(cpf.Where(char.IsDigit).ToArray());
-
-        if (digits.Length != 11 || digits.Distinct().Count() == 1)
-        {
-            return false;
-        }
-
-        static int CalculateDigit(string value, int factor)
-        {
-            var total = 0;
-
-            foreach (var digit in value)
-            {
-                total += (digit - '0') * factor--;
-            }
-
-            var rest = (total * 10) % 11;
-
-            return rest == 10 ? 0 : rest;
-        }
-
-        var firstDigit = CalculateDigit(digits[..9], 10);
-        var secondDigit = CalculateDigit(digits[..10], 11);
-
-        return firstDigit == digits[9] - '0'
-            && secondDigit == digits[10] - '0';
-    }
 }
