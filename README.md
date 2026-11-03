@@ -303,6 +303,8 @@ Para outra porta local, informe `-ApiBaseUrl http://localhost:PORTA`. Depois da 
 
 ## Testes e CI
 
+Pipelines, relatórios, proteção da branch e deploy após aprovação: [guia de CI/CD](docs/CI-CD.md).
+
 ```powershell
 dotnet restore backend.Tests/backend.Tests.csproj
 dotnet test backend.Tests/backend.Tests.csproj -c Release

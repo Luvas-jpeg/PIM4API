@@ -3,6 +3,7 @@ services:
   - type: web
     name: pim4-api-demo
     runtime: docker
+    autoDeployTrigger: checksPass
     plan: free
     region: virginia
     dockerfilePath: ./backend/Dockerfile

@@ -28,3 +28,8 @@ frontend/.env.local
 backend/appsettings.Development.json
 backend/appsettings.Local.json
 backend/appsettings.Production.json
+
+# CI outputs
+TestResults/
+artifacts/
+__pycache__/

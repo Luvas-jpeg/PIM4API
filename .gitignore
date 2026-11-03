@@ -53,3 +53,8 @@ Thumbs.db
 docker-compose.override.yml
 # Local database backups
 .local-backups/
+
+# CI outputs
+TestResults/
+artifacts/
+__pycache__/

@@ -1,18 +1,34 @@
-# This workflow will build a .NET project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
-
 name: Backend CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ['main']
   pull_request:
-    branches: [ "main" ]
+    branches: ['main']
+  workflow_dispatch:
+  schedule:
+    - cron: '43 8 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
 
 jobs:
   build:
-
+    name: Backend quality
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       PIM4_POSTGRES_TESTS: '1'
       ConnectionStrings__DefaultConnection: Host=localhost;Port=5432;Database=postgres;Username=postgres;Password=ci-only-password
@@ -25,27 +41,100 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd pg_isready
-          --health-interval 10s
+          --health-interval 5s
           --health-timeout 5s
-          --health-retries 5
-    defaults:
-      run:
-        working-directory: .
-
+          --health-retries 12
     steps:
-    - uses: actions/checkout@v4
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: 10.0.x
-    - name: Restore dependencies
-      run: dotnet restore ./backend.Tests/backend.Tests.csproj
-    - name: Build
-      run: dotnet build ./backend.Tests/backend.Tests.csproj --configuration Release --no-restore
-    - name: Test
-      run: dotnet test ./backend.Tests/backend.Tests.csproj --configuration Release --no-build --verbosity normal
-    - name: Check vulnerable packages
-      run: dotnet list ./backend/backend.csproj package --vulnerable --include-transitive
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Setup .NET
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore and audit dependencies
+        run: >-
+          dotnet restore backend.Tests/backend.Tests.csproj
+          -p:NuGetAudit=true -p:NuGetAuditMode=all -p:NuGetAuditLevel=high
+          -warnaserror:NU1900,NU1903,NU1904,NU1905
+      - name: Build
+        run: dotnet build backend.Tests/backend.Tests.csproj --configuration Release --no-restore
+      - name: Test with PostgreSQL concurrency enabled
+        run: >-
+          dotnet test backend.Tests/backend.Tests.csproj
+          --configuration Release --no-build --no-restore
+          --logger "trx;LogFileName=backend.trx"
+          --results-directory TestResults
+          --collect:"XPlat Code Coverage"
+      - name: Verify tests ran without skips
+        run: python3 scripts/ci/check-test-results.py TestResults/backend.trx
+      - name: Publish deployable application
+        run: dotnet publish backend/backend.csproj --configuration Release --no-restore --output artifacts/api
+      - name: Upload test results and coverage
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: backend-reports
+          path: TestResults/
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Upload application
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: backend-publish
+          path: artifacts/api/
+          if-no-files-found: error
+          retention-days: 7
 
-    # dotnet format is intentionally not blocking yet because the current
-    # legacy codebase still has pre-existing formatting issues.
+  docker:
+    name: Backend container
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: pim4_ci
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - name: Build the deployment image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: .
+          file: backend/Dockerfile
+          load: true
+          push: false
+          tags: pim4-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Verify startup, migrations and database access
+        run: bash scripts/ci/smoke-api.sh pim4-api:ci
+
+  gate:
+    name: Backend CI gate
+    if: always()
+    needs: [build, docker]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require all checks to pass
+        env:
+          QUALITY_RESULT: ${{ needs.build.result }}
+          CONTAINER_RESULT: ${{ needs.docker.result }}
+        run: |
+          test "$QUALITY_RESULT" = success
+          test "$CONTAINER_RESULT" = success

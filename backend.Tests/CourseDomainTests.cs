@@ -166,7 +166,7 @@ public sealed class CourseDomainTests
             Capacity = 5,
             AvailableSeats = 5,
             VafasDisponiveis = 5,
-            DataRealizacao = new DateTime(2026, 11, 1),
+            DataRealizacao = DateTime.UtcNow.AddDays(10),
             Local = "Sao Paulo",
             Instructor = "Instrutor"
         };
@@ -179,7 +179,7 @@ public sealed class CourseDomainTests
             new() { CourseId = course.Id, TurmaId = courseClass.Id, Quantidade = 1 }
         });
 
-        Assert.True(result.Success);
+        Assert.True(result.Success, result.Error);
         await fixture.Context.Entry(courseClass).ReloadAsync();
         var persistedClass = await fixture.Context.CourseClasses.SingleAsync();
         Assert.Equal(4, persistedClass.AvailableSeats);
@@ -273,7 +273,7 @@ public sealed class CourseDomainTests
             Capacity = 5,
             AvailableSeats = 5,
             VafasDisponiveis = 5,
-            DataRealizacao = new DateTime(2026, 11, 1),
+            DataRealizacao = DateTime.UtcNow.AddDays(10),
             Local = "Sao Paulo",
             Instructor = "Instrutor"
         };
