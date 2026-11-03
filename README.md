@@ -46,6 +46,8 @@ Este README descreve a configuração atual. O fluxo e os documentos de planejam
 
 ## Funcionalidades e modelo
 
+Recomendação de cursos por ML.NET/K-Means: [Machine Learning](docs/MACHINE-LEARNING.md). Os temas acadêmicos do semestre estão detalhados no [documento conjunto](../PIM4Front/docs/REQUISITOS-ACADEMICOS.md).
+
 - Catálogo público com paginação, busca, filtros e opções de filtro.
 - Administração de cursos, turmas, alunos, cupons, pedidos e auditoria.
 - Cadastro, login JWT, refresh token, perfil e autorização por usuário/role.

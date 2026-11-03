@@ -159,6 +159,7 @@ builder.Services.AddOpenApi();
 
 // --- Serviços ---
 builder.Services.AddScoped<CourseService>();
+builder.Services.AddSingleton<CourseRecommendationEngine>();
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<AuthService>();
