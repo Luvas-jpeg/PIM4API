@@ -2,7 +2,7 @@
 
 API central da plataforma MediShop, desenvolvida em ASP.NET Core/.NET 10 com Entity Framework Core e PostgreSQL. Atende o site Angular, o administrativo Windows/WPF e o futuro aplicativo Android.
 
-**Atualizado em 11/10/2026.** O escopo atual é a venda e gestão de cursos presenciais. A tabela `Products` foi removida. Pagamento externo e publicação online ainda estão pendentes. O aplicativo Flutter Android do aluno tem uma primeira implementação em PIM4Mobile, em validação para distribuição.
+**Documentação revisada em 04/11/2026.** O escopo comercial atual é a venda e gestão de cursos presenciais. A arquitetura, o DER e o dicionário de dados foram conferidos com o modelo EF Core e o snapshot. O responsável informa que o fluxo principal já foi exercitado no Render; pagamento externo, e-mail e homologação das novas versões continuam etapas próprias. O mobile não está disponível nesta instalação para inspeção.
 
 ## Índice
 
@@ -23,6 +23,8 @@ API central da plataforma MediShop, desenvolvida em ASP.NET Core/.NET 10 com Ent
 
 ## Projetos e documentação
 
+Referências técnicas atuais: [Arquitetura da API](docs/ARQUITETURA.md), [Banco de dados e DER](docs/BANCO-DE-DADOS.md), [metadados do esquema](docs/esquema-modelo.json) e [DDL de referência](docs/esquema-referencia.sql). O [guia do sistema no frontend](../PIM4Front/docs/ARQUITETURA.md) integra as visões dos clientes, API e hospedagem.
+
 ```text
 D:\Projetos\
 ├── PIM4API\       # Este repositório
@@ -33,14 +35,14 @@ D:\Projetos\
 
 O Compose usa `../PIM4Front` como contexto de build do site. Mantenha as pastas irmãs ou ajuste esse contexto.
 
-| Documento | Finalidade |
-| --- | --- |
-| [FLUXO-DE-DESENVOLVIMENTO.md](FLUXO-DE-DESENVOLVIMENTO.md) | Histórico, decisões, etapas e contexto completo |
-| [README do frontend](../PIM4Front/README.md) | Instalação, rotas, testes e publicação do site |
-| [README do desktop](../PIM4Desktop/README.md) | Configuração e distribuição Windows |
-| [docs/API.md](docs/API.md) | Documentação complementar de contratos |
-| [docs/API_REAL_PRODUCAO.md](docs/API_REAL_PRODUCAO.md) | Planejamento de API/produção |
-| [backend/openapi.yaml](backend/openapi.yaml) | Contrato alvo, que pode conter recursos planejados |
+| Documento                                                  | Finalidade                                         |
+| ---------------------------------------------------------- | -------------------------------------------------- |
+| [FLUXO-DE-DESENVOLVIMENTO.md](FLUXO-DE-DESENVOLVIMENTO.md) | Histórico, decisões, etapas e contexto completo    |
+| [README do frontend](../PIM4Front/README.md)               | Instalação, rotas, testes e publicação do site     |
+| [README do desktop](../PIM4Desktop/README.md)              | Configuração e distribuição Windows                |
+| [docs/API.md](docs/API.md)                                 | Documentação complementar de contratos             |
+| [docs/API_REAL_PRODUCAO.md](docs/API_REAL_PRODUCAO.md)     | Planejamento de API/produção                       |
+| [backend/openapi.yaml](backend/openapi.yaml)               | Contrato alvo, que pode conter recursos planejados |
 
 Este README descreve a configuração atual. O fluxo e os documentos de planejamento também contêm referências antigas a Products, caminhos em `E:\` e contratos ainda não implementados. Para confirmar endpoints disponíveis, consulte os controllers e o OpenAPI gerado pela aplicação.
 
@@ -81,16 +83,16 @@ erDiagram
 
 ## Tecnologias e requisitos
 
-| Tecnologia | Versão/configuração do repositório |
-| --- | --- |
-| ASP.NET Core / SDK .NET | 10.0 |
-| Entity Framework Core Design/Tools | 10.0.11 |
-| Npgsql EF Core | 10.0.3 |
-| PostgreSQL | Imagem `postgres:17-alpine` |
-| Autenticação | JWT Bearer e BCrypt |
-| Testes | xUnit, EF SQLite e coverlet |
-| Container API | Build SDK 10.0; runtime ASP.NET 10.0 |
-| Container frontend | Node.js 24 e Nginx 1.29 |
+| Tecnologia                         | Versão/configuração do repositório   |
+| ---------------------------------- | ------------------------------------ |
+| ASP.NET Core / SDK .NET            | 10.0                                 |
+| Entity Framework Core Design/Tools | 10.0.11                              |
+| Npgsql EF Core                     | 10.0.3                               |
+| PostgreSQL                         | Imagem `postgres:17-alpine`          |
+| Autenticação                       | JWT Bearer e BCrypt                  |
+| Testes                             | xUnit, EF SQLite e coverlet          |
+| Container API                      | Build SDK 10.0; runtime ASP.NET 10.0 |
+| Container frontend                 | Node.js 24 e Nginx 1.29              |
 
 Para rodar o ambiente completo: Docker com Compose e containers Linux. No Windows: Docker Desktop com WSL 2.
 
@@ -109,23 +111,23 @@ if (-not (Test-Path -LiteralPath .env)) {
 
 Edite o arquivo e substitua os valores `CHANGE_THIS...` por configurações locais próprias. Não publique o `.env` nem compartilhe seus valores.
 
-| Variável | Finalidade |
-| --- | --- |
-| `ASPNETCORE_ENVIRONMENT` | `Development` local; `Production` online |
-| `API_PORT` / `FRONTEND_PORT` | Portas públicas dos serviços Docker |
-| `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | Criação/configuração do PostgreSQL no Compose |
-| `POSTGRES_PORT` | Porta do banco exposta no host |
-| `ConnectionStrings__DefaultConnection` | Conexão utilizada pela API; tem prioridade sobre `Postgres__*` |
+| Variável                                                | Finalidade                                                         |
+| ------------------------------------------------------- | ------------------------------------------------------------------ |
+| `ASPNETCORE_ENVIRONMENT`                                | `Development` local; `Production` online                           |
+| `API_PORT` / `FRONTEND_PORT`                            | Portas públicas dos serviços Docker                                |
+| `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD`   | Criação/configuração do PostgreSQL no Compose                      |
+| `POSTGRES_PORT`                                         | Porta do banco exposta no host                                     |
+| `ConnectionStrings__DefaultConnection`                  | Conexão utilizada pela API; tem prioridade sobre `Postgres__*`     |
 | `Postgres__Host` / `Database` / `Username` / `Password` | Configuração alternativa, com o prefixo `Postgres__` em cada chave |
-| `Postgres__Port` / `Postgres__SslMode` | Porta alternativa e modo SSL |
-| `Jwt__Secret` | Chave JWT com pelo menos 32 bytes |
-| `Jwt__Issuer` / `Jwt__Audience` | Emissor e público dos tokens |
-| `Jwt__ExpirationHours` | Duração maior que zero e até 24 horas |
-| `Cors__AllowedOrigins__0` | Primeira origem permitida; use índices seguintes para outras |
-| `Payments__WebhookSecret` | Segredo HMAC do webhook interno |
-| `Payments__PendingOrderExpirationMinutes` | Expiração de pedidos; padrão 30 |
-| `Database__ApplyMigrationsOnStartup` | Habilita migrations na inicialização fora de Development |
-| `Https__RedirectEnabled` | Redirecionamento HTTPS; padrão ligado em produção |
+| `Postgres__Port` / `Postgres__SslMode`                  | Porta alternativa e modo SSL                                       |
+| `Jwt__Secret`                                           | Chave JWT com pelo menos 32 bytes                                  |
+| `Jwt__Issuer` / `Jwt__Audience`                         | Emissor e público dos tokens                                       |
+| `Jwt__ExpirationHours`                                  | Duração maior que zero e até 24 horas                              |
+| `Cors__AllowedOrigins__0`                               | Primeira origem permitida; use índices seguintes para outras       |
+| `Payments__WebhookSecret`                               | Segredo HMAC do webhook interno                                    |
+| `Payments__PendingOrderExpirationMinutes`               | Expiração de pedidos; padrão 30                                    |
+| `Database__ApplyMigrationsOnStartup`                    | Habilita migrations na inicialização fora de Development           |
+| `Https__RedirectEnabled`                                | Redirecionamento HTTPS; padrão ligado em produção                  |
 
 As chaves `Postgres__Database`, `Postgres__Username` e `Postgres__Password` devem ser informadas completas. `POSTGRES_DB` e `POSTGRES_PASSWORD` configuram o container do banco e não substituem, sozinhas, a conexão da API.
 
@@ -141,11 +143,11 @@ Depois de alterar o `.env`, recrie a API: `docker compose up -d --no-deps api`. 
 
 ### Limites dos containers
 
-| Serviço | CPU padrão | Memória padrão | Variáveis |
-| --- | --- | --- | --- |
-| PostgreSQL | 2 | 1024 MB | `POSTGRES_CPUS` / `POSTGRES_MEMORY_LIMIT` |
-| API | 2 | 1024 MB | `API_CPUS` / `API_MEMORY_LIMIT` |
-| Frontend | 0,5 | 256 MB | `FRONTEND_CPUS` / `FRONTEND_MEMORY_LIMIT` |
+| Serviço    | CPU padrão | Memória padrão | Variáveis                                 |
+| ---------- | ---------- | -------------- | ----------------------------------------- |
+| PostgreSQL | 2          | 1024 MB        | `POSTGRES_CPUS` / `POSTGRES_MEMORY_LIMIT` |
+| API        | 2          | 1024 MB        | `API_CPUS` / `API_MEMORY_LIMIT`           |
+| Frontend   | 0,5        | 256 MB         | `FRONTEND_CPUS` / `FRONTEND_MEMORY_LIMIT` |
 
 Esses limites valem para execução, não para build das imagens. O Compose persiste o banco no volume `postgres-data`.
 
@@ -160,13 +162,13 @@ docker compose up -d --build
 docker compose ps
 ```
 
-| Serviço | Endereço padrão |
-| --- | --- |
-| Site | http://localhost:4200 |
-| API | http://localhost:5278/api |
-| Saúde da API | http://localhost:5278/health |
+| Serviço                | Endereço padrão                       |
+| ---------------------- | ------------------------------------- |
+| Site                   | http://localhost:4200                 |
+| API                    | http://localhost:5278/api             |
+| Saúde da API           | http://localhost:5278/health          |
 | OpenAPI em Development | http://localhost:5278/openapi/v1.json |
-| PostgreSQL | localhost:5432 |
+| PostgreSQL             | localhost:5432                        |
 
 `/health` retorna 200 quando consegue conectar ao banco e 503 quando não consegue. Isso não valida todas as regras de negócio ou todos os objetos do schema.
 
@@ -210,6 +212,8 @@ Em Development, a aplicação aplica migrations ao iniciar. O frontend pode ser 
 
 ## Banco e migrations
 
+O [dicionário de dados e DER](docs/BANCO-DE-DADOS.md) documenta 21 tabelas de aplicação, 166 colunas e 29 FKs, além da tabela técnica de histórico do EF. O arquivo SQL de referência contém o modelo sem seeds e não é um procedimento para atualizar um banco existente.
+
 As migrations ficam em [backend/Migrations](backend/Migrations). Não edite migrations já aplicadas para substituir uma nova alteração de schema.
 
 - Development: migrations aplicadas automaticamente na inicialização.
@@ -243,39 +247,39 @@ Desktop e futuro Android devem acessar a API por HTTPS e JWT. Não distribua sen
 
 As rotas abaixo refletem os controllers atuais. Não são uma reprodução de todas as operações.
 
-| Método e rota | Acesso | Uso |
-| --- | --- | --- |
-| `GET /health` | Público | Conectividade com banco |
-| `GET /openapi/v1.json` | Development | Contrato gerado |
-| `POST /api/Auth/cadastrar` | Público | Cadastro Cliente |
-| `POST /api/Auth/login` | Público | Login |
-| `POST /api/Auth/refresh` | Refresh token válido | Renovação de sessão |
-| `POST /api/Auth/logout` | Autenticado | Encerramento de sessão no servidor |
-| `PUT /api/Auth/perfil` | Autenticado | Perfil |
-| `GET /api/courses/catalog` | Público | Catálogo paginado |
-| `GET /api/courses/catalog/options` | Público | Opções de filtros |
-| `GET /api/courses/{id}` | Público | Detalhes do curso |
-| `GET /api/courses` | Admin | Lista administrativa |
-| `POST /api/courses` / `PUT /api/courses/{id}` | Admin | Criar/editar curso |
-| `POST /api/courses/{id}/archive` / `restore` | Admin | Arquivar/restaurar |
-| `GET /api/courses/{courseId}/classes` | Público | Turmas |
-| `POST /api/courses/{courseId}/classes` | Admin | Criar turma |
-| `PUT /api/courses/{courseId}/classes/{classId}` | Admin | Editar turma |
-| `GET /api/courses/{courseId}/classes/{classId}/students` | Admin | Alunos da turma |
-| `POST /api/Orders` | Autenticado | Criar pedido |
-| `GET /api/Orders/my` | Autenticado | Pedidos próprios |
-| `GET /api/Orders/{id}` | Proprietário | Pedido |
-| `POST /api/Orders/{id}/cancel` | Proprietário | Cancelar conforme regras |
-| `GET /api/Orders` | Admin | Pedidos administrativos |
-| `POST /api/Orders/{id}/refund` | Admin | Fluxo interno de reembolso |
-| `GET /api/me/courses` | Autenticado | Matrículas próprias |
-| `GET /api/me/enrollments/{id}` | Proprietário | Detalhes da matrícula |
-| `GET /api/Students` | Admin | Alunos |
-| `GET /api/PromoCodes/validate` | Público | Validação de cupom |
-| `GET /api/PromoCodes` | Admin | Cupons |
-| `GET /api/audit` | Admin | Auditoria |
-| `POST /api/payments/webhook` | Assinatura HMAC | Evento interno de pagamento |
-| `GET /api/payments/webhook-events` | Admin | Histórico de eventos |
+| Método e rota                                            | Acesso               | Uso                                |
+| -------------------------------------------------------- | -------------------- | ---------------------------------- |
+| `GET /health`                                            | Público              | Conectividade com banco            |
+| `GET /openapi/v1.json`                                   | Development          | Contrato gerado                    |
+| `POST /api/Auth/cadastrar`                               | Público              | Cadastro Cliente                   |
+| `POST /api/Auth/login`                                   | Público              | Login                              |
+| `POST /api/Auth/refresh`                                 | Refresh token válido | Renovação de sessão                |
+| `POST /api/Auth/logout`                                  | Autenticado          | Encerramento de sessão no servidor |
+| `PUT /api/Auth/perfil`                                   | Autenticado          | Perfil                             |
+| `GET /api/courses/catalog`                               | Público              | Catálogo paginado                  |
+| `GET /api/courses/catalog/options`                       | Público              | Opções de filtros                  |
+| `GET /api/courses/{id}`                                  | Público              | Detalhes do curso                  |
+| `GET /api/courses`                                       | Admin                | Lista administrativa               |
+| `POST /api/courses` / `PUT /api/courses/{id}`            | Admin                | Criar/editar curso                 |
+| `POST /api/courses/{id}/archive` / `restore`             | Admin                | Arquivar/restaurar                 |
+| `GET /api/courses/{courseId}/classes`                    | Público              | Turmas                             |
+| `POST /api/courses/{courseId}/classes`                   | Admin                | Criar turma                        |
+| `PUT /api/courses/{courseId}/classes/{classId}`          | Admin                | Editar turma                       |
+| `GET /api/courses/{courseId}/classes/{classId}/students` | Admin                | Alunos da turma                    |
+| `POST /api/Orders`                                       | Autenticado          | Criar pedido                       |
+| `GET /api/Orders/my`                                     | Autenticado          | Pedidos próprios                   |
+| `GET /api/Orders/{id}`                                   | Proprietário         | Pedido                             |
+| `POST /api/Orders/{id}/cancel`                           | Proprietário         | Cancelar conforme regras           |
+| `GET /api/Orders`                                        | Admin                | Pedidos administrativos            |
+| `POST /api/Orders/{id}/refund`                           | Admin                | Fluxo interno de reembolso         |
+| `GET /api/me/courses`                                    | Autenticado          | Matrículas próprias                |
+| `GET /api/me/enrollments/{id}`                           | Proprietário         | Detalhes da matrícula              |
+| `GET /api/Students`                                      | Admin                | Alunos                             |
+| `GET /api/PromoCodes/validate`                           | Público              | Validação de cupom                 |
+| `GET /api/PromoCodes`                                    | Admin                | Cupons                             |
+| `GET /api/audit`                                         | Admin                | Auditoria                          |
+| `POST /api/payments/webhook`                             | Assinatura HMAC      | Evento interno de pagamento        |
+| `GET /api/payments/webhook-events`                       | Admin                | Histórico de eventos               |
 
 Operações adicionais de aulas, progresso, avaliações, certificados e gestão de alunos estão nos [controllers](backend/Controllers). Um reembolso interno não significa dinheiro devolvido por um gateway: essa integração continua pendente.
 
@@ -361,7 +365,7 @@ A restauração não deve apontar para o banco em uso. Confira schema, contagens
 
 ## Publicação
 
-[render.yaml](render.yaml) prepara **uma demonstração** com API Docker, PostgreSQL, health check, segredos JWT e configuração CORS. Ainda não houve publicação validada. Os planos declarados nesse arquivo precisam ser conferidos no serviço antes do deploy.
+[render.yaml](render.yaml) prepara **uma demonstração** com API Docker, PostgreSQL, health check, segredos JWT e configuração CORS. O responsável informa que o fluxo principal já foi exercitado no Render. Os commits, variáveis e configurações efetivos precisam ser conferidos no painel após cada nova publicação.
 
 O blueprint não inclui o frontend nem configura um gateway de pagamento. Não envia automaticamente os dados do banco local para o banco online.
 
@@ -381,24 +385,24 @@ No desktop, configure `Api:BaseUrl` ou `PIM4_API_BASE_URL` com a raiz HTTPS publ
 
 ## Problemas comuns e pendências
 
-| Sintoma | Verificação |
-| --- | --- |
-| Docker não conecta ao daemon | Docker Desktop iniciado e engine Linux disponível |
-| API não inicia | JWT, conexão, CORS e logs |
+| Sintoma                                        | Verificação                                                                                       |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Docker não conecta ao daemon                   | Docker Desktop iniciado e engine Linux disponível                                                 |
+| API não inicia                                 | JWT, conexão, CORS e logs                                                                         |
 | Banco recusando autenticação após editar senha | Credenciais do banco existente; mudar o .env não altera automaticamente a senha gravada no volume |
-| `Host=postgres` não resolve no Windows | Esse nome funciona na rede Docker; fora dela, use localhost |
-| 401/403 | Token, expiração, role e vínculo do recurso ao usuário |
-| 429 no cadastro/login | Limite de 5 requisições por minuto por IP, compartilhado entre cadastro/login/refresh |
-| Webhook retorna 503 | `Payments__WebhookSecret` ausente |
-| Webhook retorna 401 | Segredo, assinatura e bytes exatos do JSON |
-| Curso não permite inscrição | Início futuro, status, vagas e curso ativo |
-| Pedido pago sem liberação esperada | Reserva expirada/estado do pedido e eventos; avaliar conciliação |
-| Mudança não aparece | Reconstrução do serviço correto e configuração do proxy |
+| `Host=postgres` não resolve no Windows         | Esse nome funciona na rede Docker; fora dela, use localhost                                       |
+| 401/403                                        | Token, expiração, role e vínculo do recurso ao usuário                                            |
+| 429 no cadastro/login                          | Limite de 5 requisições por minuto por IP, compartilhado entre cadastro/login/refresh             |
+| Webhook retorna 503                            | `Payments__WebhookSecret` ausente                                                                 |
+| Webhook retorna 401                            | Segredo, assinatura e bytes exatos do JSON                                                        |
+| Curso não permite inscrição                    | Início futuro, status, vagas e curso ativo                                                        |
+| Pedido pago sem liberação esperada             | Reserva expirada/estado do pedido e eventos; avaliar conciliação                                  |
+| Mudança não aparece                            | Reconstrução do serviço correto e configuração do proxy                                           |
 
 Pendências atuais:
 
 - Integrar o pagamento real após confirmar provedor, conta e documentação.
-- Publicar API, banco e frontend e validar online.
+- Repetir a homologação online de API, banco e frontend após novas publicações.
 - Validar concorrência de compras/webhooks com PostgreSQL real.
 - Definir backup automático, retenção e restauração em produção.
 - Confirmar CI remoto e revisar dependências antes da publicação.

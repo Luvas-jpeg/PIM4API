@@ -12,7 +12,7 @@ public sealed record RecommendationCourse(int Id, string Nome, string Descriptio
 public sealed record CourseRecommendationItem(int Id, string Nome, string Category, decimal Preco,
     string Image, double Similarity);
 public sealed record CourseRecommendationResult(string Status, string Algorithm, string? ModelVersion,
-    DateTime? TrainedAt, int TrainingCourseCount, int ClusterCount, IReadOnlyList<CourseRecommendationItem> Items);
+    DateTime? TrainedAt, int TrainingCourseCount, int ClusterCount, IReadOnlyList<CourseRecommendationItem> Items, string? EmptyReason = null, int EligibleCourseCount = 0);
 
 /// <summary>Unsupervised text clustering using only public course metadata, never student attributes.</summary>
 public sealed class CourseRecommendationEngine
@@ -26,15 +26,16 @@ public sealed class CourseRecommendationEngine
     public CourseRecommendationResult Recommend(IReadOnlyList<RecommendationCourse> courses, int courseId)
     {
         var ordered = courses.OrderBy(c => c.Id).Take(MaximumCourses).ToArray();
+        var candidates = ordered.Where(c => c.Id != courseId && c.Available).ToArray();
         var input = ordered.Select(c => new TrainingRow
         {
             Id = c.Id,
             Text = $"{Limit(c.Nome, 120)} {Limit(c.Category, 120)} {Limit(c.Description, 2000)}"
         }).ToArray();
         if (input.Length < MinimumCourses || input.Select(c => c.Text.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Count() < 2)
-            return new("insufficient-data", Algorithm, null, null, input.Length, 0, []);
+            return new("insufficient-data", Algorithm, null, null, input.Length, 0, [], "insufficient-data", candidates.Length);
         if (!input.Any(c => c.Id == courseId))
-            return new("source-unavailable", Algorithm, null, null, input.Length, 0, []);
+            return new("source-unavailable", Algorithm, null, null, input.Length, 0, [], "source-unavailable", candidates.Length);
 
         var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(input))));
         Snapshot snapshot;
@@ -45,7 +46,7 @@ public sealed class CourseRecommendationEngine
             snapshot = cached;
         }
         var source = snapshot.Courses[courseId];
-        var ranked = ordered.Where(c => c.Id != courseId && c.Available)
+        var ranked = candidates
             .Select(c => (Course: c, Embedding: snapshot.Courses[c.Id]))
             .Select(c => (c.Course, SameCluster: c.Embedding.Cluster == source.Cluster,
                 Similarity: Similarity(source.Features, c.Embedding.Features)))
@@ -54,7 +55,9 @@ public sealed class CourseRecommendationEngine
             .ThenBy(c => c.Course.Id).Take(3)
             .Select(c => new CourseRecommendationItem(c.Course.Id, c.Course.Nome, c.Course.Category,
                 c.Course.Preco, c.Course.Image, Math.Round(c.Similarity, 4))).ToArray();
-        return new("ready", Algorithm, fingerprint[..12], snapshot.TrainedAt, input.Length, snapshot.ClusterCount, ranked);
+        return new("ready", Algorithm, fingerprint[..12], snapshot.TrainedAt, input.Length, snapshot.ClusterCount, ranked,
+            ranked.Length > 0 ? null : candidates.Length == 0 ? "no-available-courses" : "no-similar-courses",
+            candidates.Length);
     }
 
     private static Snapshot Train(TrainingRow[] rows, string fingerprint)

@@ -1,0 +1,2561 @@
+{
+  "Tables": [
+    {
+      "Entity": "AuditLog",
+      "Table": "AuditLogs",
+      "Schema": "public",
+      "Columns": [
+        {
+          "Name": "Id",
+          "Type": "bigint",
+          "Nullable": false,
+          "PrimaryKey": true,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Action",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "CreatedAt",
+          "Type": "timestamp with time zone",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "EntityId",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "EntityType",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "NewValue",
+          "Type": "text",
+          "Nullable": true,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "PreviousValue",
+          "Type": "text",
+          "Nullable": true,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "UserId",
+          "Type": "integer",
+          "Nullable": true,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        }
+      ],
+      "ForeignKeys": [
+        {
+          "Name": "FK_AuditLogs_Users_UserId",
+          "Columns": ["UserId"],
+          "Target": "Users",
+          "TargetColumns": ["ID"],
+          "Required": false,
+          "Unique": false,
+          "Delete": "SetNull"
+        }
+      ],
+      "Indexes": [
+        {
+          "Name": "IX_AuditLogs_UserId",
+          "Columns": ["UserId"],
+          "Unique": false,
+          "Filter": null
+        },
+        {
+          "Name": "IX_AuditLogs_EntityType_EntityId_CreatedAt",
+          "Columns": ["EntityType", "EntityId", "CreatedAt"],
+          "Unique": false,
+          "Filter": null
+        }
+      ]
+    },
+    {
+      "Entity": "CourseAssessmentAnswer",
+      "Table": "CourseAssessmentAnswers",
+      "Schema": "public",
+      "Columns": [
+        {
+          "Name": "Id",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": true,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "AttemptId",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "IsCorrect",
+          "Type": "boolean",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "QuestionId",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "SelectedOptionId",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        }
+      ],
+      "ForeignKeys": [
+        {
+          "Name": "FK_CourseAssessmentAnswers_CourseAssessmentAttempts_AttemptId",
+          "Columns": ["AttemptId"],
+          "Target": "CourseAssessmentAttempts",
+          "TargetColumns": ["Id"],
+          "Required": true,
+          "Unique": false,
+          "Delete": "Cascade"
+        },
+        {
+          "Name": "FK_CourseAssessmentAnswers_CourseQuestions_QuestionId",
+          "Columns": ["QuestionId"],
+          "Target": "CourseQuestions",
+          "TargetColumns": ["Id"],
+          "Required": true,
+          "Unique": false,
+          "Delete": "Cascade"
+        },
+        {
+          "Name": "FK_CourseAssessmentAnswers_CourseQuestionOptions_SelectedOptio~",
+          "Columns": ["SelectedOptionId"],
+          "Target": "CourseQuestionOptions",
+          "TargetColumns": ["Id"],
+          "Required": true,
+          "Unique": false,
+          "Delete": "Cascade"
+        }
+      ],
+      "Indexes": [
+        {
+          "Name": "IX_CourseAssessmentAnswers_AttemptId",
+          "Columns": ["AttemptId"],
+          "Unique": false,
+          "Filter": null
+        },
+        {
+          "Name": "IX_CourseAssessmentAnswers_QuestionId",
+          "Columns": ["QuestionId"],
+          "Unique": false,
+          "Filter": null
+        },
+        {
+          "Name": "IX_CourseAssessmentAnswers_SelectedOptionId",
+          "Columns": ["SelectedOptionId"],
+          "Unique": false,
+          "Filter": null
+        }
+      ]
+    },
+    {
+      "Entity": "CourseAssessmentAttempt",
+      "Table": "CourseAssessmentAttempts",
+      "Schema": "public",
+      "Columns": [
+        {
+          "Name": "Id",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": true,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "AssessmentId",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "AttemptNumber",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "CourseId",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Passed",
+          "Type": "boolean",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Score",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "SubmittedAt",
+          "Type": "timestamp with time zone",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "UserId",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        }
+      ],
+      "ForeignKeys": [
+        {
+          "Name": "FK_CourseAssessmentAttempts_CourseAssessments_AssessmentId",
+          "Columns": ["AssessmentId"],
+          "Target": "CourseAssessments",
+          "TargetColumns": ["Id"],
+          "Required": true,
+          "Unique": false,
+          "Delete": "Cascade"
+        },
+        {
+          "Name": "FK_CourseAssessmentAttempts_Courses_CourseId",
+          "Columns": ["CourseId"],
+          "Target": "Courses",
+          "TargetColumns": ["Id"],
+          "Required": true,
+          "Unique": false,
+          "Delete": "Cascade"
+        },
+        {
+          "Name": "FK_CourseAssessmentAttempts_Users_UserId",
+          "Columns": ["UserId"],
+          "Target": "Users",
+          "TargetColumns": ["ID"],
+          "Required": true,
+          "Unique": false,
+          "Delete": "Cascade"
+        }
+      ],
+      "Indexes": [
+        {
+          "Name": "IX_CourseAssessmentAttempts_AssessmentId",
+          "Columns": ["AssessmentId"],
+          "Unique": false,
+          "Filter": null
+        },
+        {
+          "Name": "IX_CourseAssessmentAttempts_CourseId",
+          "Columns": ["CourseId"],
+          "Unique": false,
+          "Filter": null
+        },
+        {
+          "Name": "IX_CourseAssessmentAttempts_UserId_AssessmentId_AttemptNumber",
+          "Columns": ["UserId", "AssessmentId", "AttemptNumber"],
+          "Unique": true,
+          "Filter": null
+        }
+      ]
+    },
+    {
+      "Entity": "CourseAssessment",
+      "Table": "CourseAssessments",
+      "Schema": "public",
+      "Columns": [
+        {
+          "Name": "Id",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": true,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "CourseId",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "IsActive",
+          "Type": "boolean",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "MaxAttempts",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "MinimumScore",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Title",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        }
+      ],
+      "ForeignKeys": [
+        {
+          "Name": "FK_CourseAssessments_Courses_CourseId",
+          "Columns": ["CourseId"],
+          "Target": "Courses",
+          "TargetColumns": ["Id"],
+          "Required": true,
+          "Unique": false,
+          "Delete": "Cascade"
+        }
+      ],
+      "Indexes": [
+        {
+          "Name": "IX_CourseAssessments_CourseId",
+          "Columns": ["CourseId"],
+          "Unique": false,
+          "Filter": null
+        }
+      ]
+    },
+    {
+      "Entity": "CourseCertificate",
+      "Table": "CourseCertificates",
+      "Schema": "public",
+      "Columns": [
+        {
+          "Name": "Id",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": true,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "CourseId",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "IssuedAt",
+          "Type": "timestamp with time zone",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "UserId",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "ValidationCode",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        }
+      ],
+      "ForeignKeys": [
+        {
+          "Name": "FK_CourseCertificates_Courses_CourseId",
+          "Columns": ["CourseId"],
+          "Target": "Courses",
+          "TargetColumns": ["Id"],
+          "Required": true,
+          "Unique": false,
+          "Delete": "Cascade"
+        },
+        {
+          "Name": "FK_CourseCertificates_Users_UserId",
+          "Columns": ["UserId"],
+          "Target": "Users",
+          "TargetColumns": ["ID"],
+          "Required": true,
+          "Unique": false,
+          "Delete": "Cascade"
+        }
+      ],
+      "Indexes": [
+        {
+          "Name": "IX_CourseCertificates_CourseId",
+          "Columns": ["CourseId"],
+          "Unique": false,
+          "Filter": null
+        },
+        {
+          "Name": "IX_CourseCertificates_ValidationCode",
+          "Columns": ["ValidationCode"],
+          "Unique": true,
+          "Filter": null
+        },
+        {
+          "Name": "IX_CourseCertificates_UserId_CourseId",
+          "Columns": ["UserId", "CourseId"],
+          "Unique": true,
+          "Filter": null
+        }
+      ]
+    },
+    {
+      "Entity": "CourseClass",
+      "Table": "CourseClasses",
+      "Schema": "public",
+      "Columns": [
+        {
+          "Name": "Id",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": true,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "AvailableSeats",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": 0,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Capacity",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": 0,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "CourseId",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "DataRealizacao",
+          "Type": "timestamp with time zone",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "EndDate",
+          "Type": "timestamp with time zone",
+          "Nullable": true,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Instructor",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Local",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Status",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": "scheduled",
+          "DefaultSql": null,
+          "Shadow": false
+        }
+      ],
+      "ForeignKeys": [
+        {
+          "Name": "FK_CourseClasses_Courses_CourseId",
+          "Columns": ["CourseId"],
+          "Target": "Courses",
+          "TargetColumns": ["Id"],
+          "Required": true,
+          "Unique": false,
+          "Delete": "Restrict"
+        }
+      ],
+      "Indexes": [
+        {
+          "Name": "IX_CourseClasses_CourseId",
+          "Columns": ["CourseId"],
+          "Unique": false,
+          "Filter": null
+        }
+      ]
+    },
+    {
+      "Entity": "CourseInterest",
+      "Table": "CourseInterests",
+      "Schema": "public",
+      "Columns": [
+        {
+          "Name": "Id",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": true,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "CourseId",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "CreatedAt",
+          "Type": "timestamp with time zone",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Email",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Name",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Phone",
+          "Type": "text",
+          "Nullable": true,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Status",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        }
+      ],
+      "ForeignKeys": [
+        {
+          "Name": "FK_CourseInterests_Courses_CourseId",
+          "Columns": ["CourseId"],
+          "Target": "Courses",
+          "TargetColumns": ["Id"],
+          "Required": true,
+          "Unique": false,
+          "Delete": "Cascade"
+        }
+      ],
+      "Indexes": [
+        {
+          "Name": "IX_CourseInterests_CourseId_Email",
+          "Columns": ["CourseId", "Email"],
+          "Unique": true,
+          "Filter": null
+        }
+      ]
+    },
+    {
+      "Entity": "CourseLesson",
+      "Table": "CourseLessons",
+      "Schema": "public",
+      "Columns": [
+        {
+          "Name": "Id",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": true,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Description",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "DurationMinutes",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "IsActive",
+          "Type": "boolean",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "ModuleId",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "SortOrder",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Title",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "VideoUrl",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        }
+      ],
+      "ForeignKeys": [
+        {
+          "Name": "FK_CourseLessons_CourseModules_ModuleId",
+          "Columns": ["ModuleId"],
+          "Target": "CourseModules",
+          "TargetColumns": ["Id"],
+          "Required": true,
+          "Unique": false,
+          "Delete": "Cascade"
+        }
+      ],
+      "Indexes": [
+        {
+          "Name": "IX_CourseLessons_ModuleId",
+          "Columns": ["ModuleId"],
+          "Unique": false,
+          "Filter": null
+        }
+      ]
+    },
+    {
+      "Entity": "CourseModule",
+      "Table": "CourseModules",
+      "Schema": "public",
+      "Columns": [
+        {
+          "Name": "Id",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": true,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "CourseId",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "IsActive",
+          "Type": "boolean",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "SortOrder",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Title",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        }
+      ],
+      "ForeignKeys": [
+        {
+          "Name": "FK_CourseModules_Courses_CourseId",
+          "Columns": ["CourseId"],
+          "Target": "Courses",
+          "TargetColumns": ["Id"],
+          "Required": true,
+          "Unique": false,
+          "Delete": "Cascade"
+        }
+      ],
+      "Indexes": [
+        {
+          "Name": "IX_CourseModules_CourseId",
+          "Columns": ["CourseId"],
+          "Unique": false,
+          "Filter": null
+        }
+      ]
+    },
+    {
+      "Entity": "CourseProgress",
+      "Table": "CourseProgresses",
+      "Schema": "public",
+      "Columns": [
+        {
+          "Name": "Id",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": true,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "CompletedAt",
+          "Type": "timestamp with time zone",
+          "Nullable": true,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "CompletedLessons",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "CourseId",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "LastSeenAt",
+          "Type": "timestamp with time zone",
+          "Nullable": true,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Percent",
+          "Type": "double precision",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "UserId",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        }
+      ],
+      "ForeignKeys": [
+        {
+          "Name": "FK_CourseProgresses_Users_UserId",
+          "Columns": ["UserId"],
+          "Target": "Users",
+          "TargetColumns": ["ID"],
+          "Required": true,
+          "Unique": false,
+          "Delete": "Cascade"
+        }
+      ],
+      "Indexes": [
+        {
+          "Name": "IX_CourseProgresses_UserId_CourseId",
+          "Columns": ["UserId", "CourseId"],
+          "Unique": true,
+          "Filter": null
+        }
+      ]
+    },
+    {
+      "Entity": "CourseQuestionOption",
+      "Table": "CourseQuestionOptions",
+      "Schema": "public",
+      "Columns": [
+        {
+          "Name": "Id",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": true,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "IsCorrect",
+          "Type": "boolean",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "QuestionId",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "SortOrder",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Text",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        }
+      ],
+      "ForeignKeys": [
+        {
+          "Name": "FK_CourseQuestionOptions_CourseQuestions_QuestionId",
+          "Columns": ["QuestionId"],
+          "Target": "CourseQuestions",
+          "TargetColumns": ["Id"],
+          "Required": true,
+          "Unique": false,
+          "Delete": "Cascade"
+        }
+      ],
+      "Indexes": [
+        {
+          "Name": "IX_CourseQuestionOptions_QuestionId",
+          "Columns": ["QuestionId"],
+          "Unique": false,
+          "Filter": null
+        }
+      ]
+    },
+    {
+      "Entity": "CourseQuestion",
+      "Table": "CourseQuestions",
+      "Schema": "public",
+      "Columns": [
+        {
+          "Name": "Id",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": true,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "AssessmentId",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "IsActive",
+          "Type": "boolean",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "SortOrder",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Statement",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        }
+      ],
+      "ForeignKeys": [
+        {
+          "Name": "FK_CourseQuestions_CourseAssessments_AssessmentId",
+          "Columns": ["AssessmentId"],
+          "Target": "CourseAssessments",
+          "TargetColumns": ["Id"],
+          "Required": true,
+          "Unique": false,
+          "Delete": "Cascade"
+        }
+      ],
+      "Indexes": [
+        {
+          "Name": "IX_CourseQuestions_AssessmentId",
+          "Columns": ["AssessmentId"],
+          "Unique": false,
+          "Filter": null
+        }
+      ]
+    },
+    {
+      "Entity": "Course",
+      "Table": "Courses",
+      "Schema": "public",
+      "Columns": [
+        {
+          "Name": "Id",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": true,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Category",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "DeliveryMode",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": "presencial",
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Description",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Image",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "IsActive",
+          "Type": "boolean",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Nome",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Preco",
+          "Type": "numeric",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "WorkloadHours",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": 0,
+          "DefaultSql": null,
+          "Shadow": false
+        }
+      ],
+      "ForeignKeys": [],
+      "Indexes": []
+    },
+    {
+      "Entity": "Enrollment",
+      "Table": "Enrollments",
+      "Schema": "public",
+      "Columns": [
+        {
+          "Name": "Id",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": true,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "ClassId",
+          "Type": "integer",
+          "Nullable": true,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "CourseId",
+          "Type": "integer",
+          "Nullable": true,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "EnrolledAt",
+          "Type": "timestamp with time zone",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": null,
+          "DefaultSql": "CURRENT_TIMESTAMP",
+          "Shadow": false
+        },
+        {
+          "Name": "OrderId",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "ParticipationConfirmedAt",
+          "Type": "timestamp with time zone",
+          "Nullable": true,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "ParticipationStartDate",
+          "Type": "timestamp with time zone",
+          "Nullable": true,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Status",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "StudentId",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        }
+      ],
+      "ForeignKeys": [
+        {
+          "Name": "FK_Enrollments_CourseClasses_ClassId",
+          "Columns": ["ClassId"],
+          "Target": "CourseClasses",
+          "TargetColumns": ["Id"],
+          "Required": false,
+          "Unique": false,
+          "Delete": "SetNull"
+        },
+        {
+          "Name": "FK_Enrollments_Courses_CourseId",
+          "Columns": ["CourseId"],
+          "Target": "Courses",
+          "TargetColumns": ["Id"],
+          "Required": false,
+          "Unique": false,
+          "Delete": "SetNull"
+        },
+        {
+          "Name": "FK_Enrollments_Orders_OrderId",
+          "Columns": ["OrderId"],
+          "Target": "Orders",
+          "TargetColumns": ["Id"],
+          "Required": true,
+          "Unique": false,
+          "Delete": "Cascade"
+        },
+        {
+          "Name": "FK_Enrollments_Students_StudentId",
+          "Columns": ["StudentId"],
+          "Target": "Students",
+          "TargetColumns": ["Id"],
+          "Required": true,
+          "Unique": false,
+          "Delete": "Cascade"
+        }
+      ],
+      "Indexes": [
+        {
+          "Name": "IX_Enrollments_ClassId",
+          "Columns": ["ClassId"],
+          "Unique": false,
+          "Filter": null
+        },
+        {
+          "Name": "IX_Enrollments_CourseId",
+          "Columns": ["CourseId"],
+          "Unique": false,
+          "Filter": null
+        },
+        {
+          "Name": "IX_Enrollments_OrderId",
+          "Columns": ["OrderId"],
+          "Unique": false,
+          "Filter": null
+        },
+        {
+          "Name": "IX_Enrollments_StudentId",
+          "Columns": ["StudentId"],
+          "Unique": false,
+          "Filter": null
+        }
+      ]
+    },
+    {
+      "Entity": "OrderItem",
+      "Table": "OrderItems",
+      "Schema": "public",
+      "Columns": [
+        {
+          "Name": "Id",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": true,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "CourseId",
+          "Type": "integer",
+          "Nullable": true,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "ItemType",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "NameSnapshot",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "PedidoId",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "PrecoUnitario",
+          "Type": "numeric",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Quantidade",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "TurmaId",
+          "Type": "integer",
+          "Nullable": true,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        }
+      ],
+      "ForeignKeys": [
+        {
+          "Name": "FK_OrderItems_Courses_CourseId",
+          "Columns": ["CourseId"],
+          "Target": "Courses",
+          "TargetColumns": ["Id"],
+          "Required": false,
+          "Unique": false,
+          "Delete": "Restrict"
+        },
+        {
+          "Name": "FK_OrderItems_Orders_PedidoId",
+          "Columns": ["PedidoId"],
+          "Target": "Orders",
+          "TargetColumns": ["Id"],
+          "Required": true,
+          "Unique": false,
+          "Delete": "Cascade"
+        },
+        {
+          "Name": "FK_OrderItems_CourseClasses_TurmaId",
+          "Columns": ["TurmaId"],
+          "Target": "CourseClasses",
+          "TargetColumns": ["Id"],
+          "Required": false,
+          "Unique": false,
+          "Delete": "ClientSetNull"
+        }
+      ],
+      "Indexes": [
+        {
+          "Name": "IX_OrderItems_CourseId",
+          "Columns": ["CourseId"],
+          "Unique": false,
+          "Filter": null
+        },
+        {
+          "Name": "IX_OrderItems_PedidoId",
+          "Columns": ["PedidoId"],
+          "Unique": false,
+          "Filter": null
+        },
+        {
+          "Name": "IX_OrderItems_TurmaId",
+          "Columns": ["TurmaId"],
+          "Unique": false,
+          "Filter": null
+        }
+      ]
+    },
+    {
+      "Entity": "Order",
+      "Table": "Orders",
+      "Schema": "public",
+      "Columns": [
+        {
+          "Name": "Id",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": true,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "DataPedido",
+          "Type": "timestamp with time zone",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "GatewayPaymentId",
+          "Type": "text",
+          "Nullable": true,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "IdempotencyKey",
+          "Type": "text",
+          "Nullable": true,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Installments",
+          "Type": "integer",
+          "Nullable": true,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "PaidAt",
+          "Type": "timestamp with time zone",
+          "Nullable": true,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "PaymentMethod",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "PaymentStatus",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": "pending",
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "PromoCode",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "PromoCodeId",
+          "Type": "integer",
+          "Nullable": true,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Status",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": "pending",
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Total",
+          "Type": "numeric",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "UsuarioId",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "ValorFrete",
+          "Type": "numeric",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        }
+      ],
+      "ForeignKeys": [
+        {
+          "Name": "FK_Orders_PromoCodes_PromoCodeId",
+          "Columns": ["PromoCodeId"],
+          "Target": "PromoCodes",
+          "TargetColumns": ["Id"],
+          "Required": false,
+          "Unique": false,
+          "Delete": "Restrict"
+        },
+        {
+          "Name": "FK_Orders_Users_UsuarioId",
+          "Columns": ["UsuarioId"],
+          "Target": "Users",
+          "TargetColumns": ["ID"],
+          "Required": true,
+          "Unique": false,
+          "Delete": "Cascade"
+        }
+      ],
+      "Indexes": [
+        {
+          "Name": "IX_Orders_PromoCodeId",
+          "Columns": ["PromoCodeId"],
+          "Unique": false,
+          "Filter": null
+        },
+        {
+          "Name": "IX_Orders_UsuarioId_IdempotencyKey",
+          "Columns": ["UsuarioId", "IdempotencyKey"],
+          "Unique": true,
+          "Filter": "\"IdempotencyKey\" IS NOT NULL"
+        }
+      ]
+    },
+    {
+      "Entity": "PaymentWebhookEvent",
+      "Table": "PaymentWebhookEvents",
+      "Schema": "public",
+      "Columns": [
+        {
+          "Name": "Id",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": true,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "EventId",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "OrderId",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "PaymentId",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "ProcessedAt",
+          "Type": "timestamp with time zone",
+          "Nullable": true,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "ReceivedAt",
+          "Type": "timestamp with time zone",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Status",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        }
+      ],
+      "ForeignKeys": [
+        {
+          "Name": "FK_PaymentWebhookEvents_Orders_OrderId",
+          "Columns": ["OrderId"],
+          "Target": "Orders",
+          "TargetColumns": ["Id"],
+          "Required": true,
+          "Unique": false,
+          "Delete": "Cascade"
+        }
+      ],
+      "Indexes": [
+        {
+          "Name": "IX_PaymentWebhookEvents_EventId",
+          "Columns": ["EventId"],
+          "Unique": true,
+          "Filter": null
+        },
+        {
+          "Name": "IX_PaymentWebhookEvents_OrderId",
+          "Columns": ["OrderId"],
+          "Unique": false,
+          "Filter": null
+        }
+      ]
+    },
+    {
+      "Entity": "PromoCode",
+      "Table": "PromoCodes",
+      "Schema": "public",
+      "Columns": [
+        {
+          "Name": "Id",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": true,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Code",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Discount",
+          "Type": "numeric",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "DiscountType",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "EndDate",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "IsActive",
+          "Type": "boolean",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "StartDate",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "UsageCount",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "UsageLimit",
+          "Type": "integer",
+          "Nullable": true,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        }
+      ],
+      "ForeignKeys": [],
+      "Indexes": [
+        {
+          "Name": "IX_PromoCodes_Code",
+          "Columns": ["Code"],
+          "Unique": true,
+          "Filter": null
+        }
+      ]
+    },
+    {
+      "Entity": "RefreshToken",
+      "Table": "RefreshTokens",
+      "Schema": "public",
+      "Columns": [
+        {
+          "Name": "Id",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": true,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "CreatedAt",
+          "Type": "timestamp with time zone",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "ExpiresAt",
+          "Type": "timestamp with time zone",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "ReplacedByToken",
+          "Type": "text",
+          "Nullable": true,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "RevokedAt",
+          "Type": "timestamp with time zone",
+          "Nullable": true,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Token",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "UserId",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        }
+      ],
+      "ForeignKeys": [
+        {
+          "Name": "FK_RefreshTokens_Users_UserId",
+          "Columns": ["UserId"],
+          "Target": "Users",
+          "TargetColumns": ["ID"],
+          "Required": true,
+          "Unique": false,
+          "Delete": "Cascade"
+        }
+      ],
+      "Indexes": [
+        {
+          "Name": "IX_RefreshTokens_Token",
+          "Columns": ["Token"],
+          "Unique": true,
+          "Filter": null
+        },
+        {
+          "Name": "IX_RefreshTokens_UserId",
+          "Columns": ["UserId"],
+          "Unique": false,
+          "Filter": null
+        }
+      ]
+    },
+    {
+      "Entity": "Student",
+      "Table": "Students",
+      "Schema": "public",
+      "Columns": [
+        {
+          "Name": "Id",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": true,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "CourseId",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "CourseName",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Email",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "EnrollmentDate",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Name",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Phone",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Status",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "UserId",
+          "Type": "integer",
+          "Nullable": true,
+          "PrimaryKey": false,
+          "ForeignKey": true,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        }
+      ],
+      "ForeignKeys": [
+        {
+          "Name": "FK_Students_Users_UserId",
+          "Columns": ["UserId"],
+          "Target": "Users",
+          "TargetColumns": ["ID"],
+          "Required": false,
+          "Unique": false,
+          "Delete": "SetNull"
+        }
+      ],
+      "Indexes": [
+        {
+          "Name": "IX_Students_UserId",
+          "Columns": ["UserId"],
+          "Unique": false,
+          "Filter": null
+        }
+      ]
+    },
+    {
+      "Entity": "User",
+      "Table": "Users",
+      "Schema": "public",
+      "Columns": [
+        {
+          "Name": "ID",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": true,
+          "ForeignKey": false,
+          "Generated": "OnAdd",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "City",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Complement",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Cpf",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Email",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "FailedLoginAttempts",
+          "Type": "integer",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "LockoutEnd",
+          "Type": "timestamp with time zone",
+          "Nullable": true,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Neighborhood",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Nome",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Number",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Phone",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Role",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "SenhaHash",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "State",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "Street",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        },
+        {
+          "Name": "ZipCode",
+          "Type": "text",
+          "Nullable": false,
+          "PrimaryKey": false,
+          "ForeignKey": false,
+          "Generated": "Never",
+          "DefaultValue": null,
+          "DefaultSql": null,
+          "Shadow": false
+        }
+      ],
+      "ForeignKeys": [],
+      "Indexes": [
+        {
+          "Name": "IX_Users_Email",
+          "Columns": ["Email"],
+          "Unique": true,
+          "Filter": null
+        }
+      ]
+    }
+  ],
+  "Migrations": [
+    "20260404160204_InitialCreate",
+    "20260404161937_AddProductDetails",
+    "20260503160000_AddCourseProductDetails",
+    "20260504120000_AddStudentsAndPromoCodes",
+    "20260522174500_SeedAdminUser",
+    "20260526120000_AddUserRoles",
+    "20260526123000_AddUserProfileFields",
+    "20260526130000_AddUserAddressFields",
+    "20260526133000_RenameInscricoesToEnrollments",
+    "20260608150000_AddOrderPaymentFields",
+    "20260815201619_AddRefreshTokenPaymentProgress",
+    "20260828115348_AddOrderIdempotencyAndUniqueIndexes",
+    "20260902125852_IntroduceCoursesAndExplicitClasses",
+    "20260904090000_AllowCourseClassesWithoutLegacyProduct",
+    "20260910165744_AddPaymentWebhookEvents",
+    "20260915144829_AddAuditLogs",
+    "20260921185324_AddAccountLockout",
+    "20260922175450_LinkStudentsToUsers",
+    "20260929152030_MigrateLegacyCoursesAndAddCourseInterests",
+    "20260929175643_AddDirectCourseReferenceToOrderItems",
+    "20261004135219_DecoupleCourseClassesFromProducts",
+    "20261008160715_RemoveProducts",
+    "20261017164427_AddParticipationConfirmation",
+    "20261024135217_HardenEnrollmentAndReservations"
+  ],
+  "SnapshotMatchesModel": true,
+  "Origin": {
+    "ReferenceDate": "2026-11-04",
+    "Source": "EF Core design-time model with Npgsql; no database connection",
+    "ModelSourceSha256": "29b6ba3931b731b01e7607640784da40d8bfdd2073f7cc9d3b6b6697ee1c616c",
+    "BaseCommit": "56c95ce0a2e70b7dc7c52ecbc42aa11f6d24801e"
+  }
+}

@@ -54,4 +54,28 @@ public sealed class CourseRecommendationTests
         Assert.Null(result.ModelVersion);
         Assert.Empty(result.Items);
     }
+    [Fact]
+    public void ReadyModelExplainsWhenNoOtherCourseHasAvailableClasses()
+    {
+        var courses = Catalog().Select(c => c with { Available = false }).ToArray();
+        var result = new CourseRecommendationEngine().Recommend(courses, 1);
+        Assert.Equal("ready", result.Status);
+        Assert.NotNull(result.ModelVersion);
+        Assert.Equal("no-available-courses", result.EmptyReason);
+        Assert.Equal(0, result.EligibleCourseCount);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public void ReadyModelExplainsWhenAvailableCoursesHaveNoSimilarContent()
+    {
+        string[] texts = ["alfabetounico", "binariodistinto", "cromaticoexclusivo", "dinamicodiverso"];
+        var courses = texts.Select((text, i) => new RecommendationCourse(i + 1, text, text, text, 100, "", true)).ToArray();
+        var result = new CourseRecommendationEngine().Recommend(courses, 1);
+        Assert.Equal("ready", result.Status);
+        Assert.Equal("no-similar-courses", result.EmptyReason);
+        Assert.Equal(3, result.EligibleCourseCount);
+        Assert.Empty(result.Items);
+    }
+
 }

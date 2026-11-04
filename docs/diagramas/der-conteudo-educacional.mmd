@@ -1,0 +1,84 @@
+erDiagram
+    CourseAssessmentAnswers {
+        int Id PK
+        int AttemptId FK
+        boolean IsCorrect
+        int QuestionId FK
+        int SelectedOptionId FK
+    }
+    CourseAssessmentAttempts {
+        int Id PK
+        int AssessmentId FK
+        int CourseId FK
+        boolean Passed
+        int Score
+        int UserId FK
+    }
+    CourseAssessments {
+        int Id PK
+        int CourseId FK
+        int MinimumScore
+        string Title
+    }
+    CourseCertificates {
+        int Id PK
+        int CourseId FK
+        timestamp_tz IssuedAt
+        int UserId FK
+        string ValidationCode UK
+    }
+    CourseLessons {
+        int Id PK
+        int DurationMinutes
+        int ModuleId FK
+        string Title
+    }
+    CourseModules {
+        int Id PK
+        int CourseId FK
+        int SortOrder
+        string Title
+    }
+    CourseProgresses {
+        int Id PK
+        string CompletedLessons
+        float8 Percent
+        int UserId FK
+    }
+    CourseQuestionOptions {
+        int Id PK
+        boolean IsCorrect
+        int QuestionId FK
+        string Text
+    }
+    CourseQuestions {
+        int Id PK
+        int AssessmentId FK
+        string Statement
+    }
+    Courses {
+        int Id PK
+        string DeliveryMode
+        string Nome
+        decimal Preco
+    }
+    Users {
+        int ID PK
+        string Email UK
+        string Nome
+        string Role
+    }
+    CourseAssessmentAttempts ||..o{ CourseAssessmentAnswers : "AttemptId"
+    CourseQuestions ||..o{ CourseAssessmentAnswers : "QuestionId"
+    CourseQuestionOptions ||..o{ CourseAssessmentAnswers : "SelectedOptionId"
+    CourseAssessments ||..o{ CourseAssessmentAttempts : "AssessmentId"
+    Courses ||..o{ CourseAssessmentAttempts : "CourseId"
+    Users ||..o{ CourseAssessmentAttempts : "UserId"
+    Courses ||..o{ CourseAssessments : "CourseId"
+    Courses ||..o{ CourseCertificates : "CourseId"
+    Users ||..o{ CourseCertificates : "UserId"
+    CourseModules ||..o{ CourseLessons : "ModuleId"
+    Courses ||..o{ CourseModules : "CourseId"
+    Users ||..o{ CourseProgresses : "UserId"
+    CourseQuestions ||..o{ CourseQuestionOptions : "QuestionId"
+    CourseAssessments ||..o{ CourseQuestions : "AssessmentId"

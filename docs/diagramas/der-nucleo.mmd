@@ -1,0 +1,76 @@
+erDiagram
+    CourseClasses {
+        int Id PK
+        int AvailableSeats
+        int Capacity
+        int CourseId FK
+        timestamp_tz DataRealizacao
+        string Status
+    }
+    Courses {
+        int Id PK
+        string DeliveryMode
+        string Nome
+        decimal Preco
+    }
+    Enrollments {
+        int Id PK
+        int ClassId FK "opcional"
+        int CourseId FK "opcional"
+        timestamp_tz EnrolledAt
+        int OrderId FK
+        string Status
+        int StudentId FK
+    }
+    OrderItems {
+        int Id PK
+        int CourseId FK "opcional"
+        string NameSnapshot
+        int PedidoId FK
+        decimal PrecoUnitario
+        int Quantidade
+        int TurmaId FK "opcional"
+    }
+    Orders {
+        int Id PK
+        string PaymentStatus
+        int PromoCodeId FK "opcional"
+        string Status
+        decimal Total
+        int UsuarioId FK
+    }
+    PaymentWebhookEvents {
+        int Id PK
+        string EventId UK
+        int OrderId FK
+        string Status
+    }
+    PromoCodes {
+        int Id PK
+        string Code UK
+        decimal Discount
+        int UsageCount
+    }
+    Students {
+        int Id PK
+        string Name
+        string Status
+        int UserId FK "opcional"
+    }
+    Users {
+        int ID PK
+        string Email UK
+        string Nome
+        string Role
+    }
+    Courses ||..o{ CourseClasses : "CourseId"
+    CourseClasses |o..o{ Enrollments : "ClassId"
+    Courses |o..o{ Enrollments : "CourseId"
+    Orders ||..o{ Enrollments : "OrderId"
+    Students ||..o{ Enrollments : "StudentId"
+    Courses |o..o{ OrderItems : "CourseId"
+    Orders ||..o{ OrderItems : "PedidoId"
+    CourseClasses |o..o{ OrderItems : "TurmaId"
+    PromoCodes |o..o{ Orders : "PromoCodeId"
+    Users ||..o{ Orders : "UsuarioId"
+    Orders ||..o{ PaymentWebhookEvents : "OrderId"

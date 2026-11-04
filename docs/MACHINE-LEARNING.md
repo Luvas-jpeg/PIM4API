@@ -16,6 +16,8 @@ A API usa Microsoft.ML 5.0.1 e K-Means para agrupar cursos por conteúdo. A prep
 
 `modelVersion` é um resumo do hash da entrada de treinamento, não uma medida de desempenho. O agrupamento é do catálogo atual; não representa previsão de compra nem recomendação personalizada para cada aluno. Os testes sintéticos não demonstram relevância pedagógica em produção.
 
+Quando `items` está vazio, `emptyReason` explica a causa: `no-available-courses` indica que não há outros cursos com turmas futuras agendadas e vagas; `no-similar-courses` indica que há candidatos disponíveis, mas nenhum atingiu o limiar de similaridade. `eligibleCourseCount` informa quantos outros cursos disponíveis foram avaliados. O estado `ready` descreve o modelo treinado, não garante recomendações. O frontend mantém a seção visível e exibe uma mensagem para listas vazias; versões antigas da API continuam com uma mensagem genérica compatível.
+
 ## Arquivos
 
 - `backend/Services/CourseRecommendationEngine.cs`: preparação, treinamento, cache e ordenação.

@@ -1,0 +1,42 @@
+erDiagram
+    AuditLogs {
+        bigint Id PK
+        string Action
+        timestamp_tz CreatedAt
+        string EntityType
+        int UserId FK "opcional"
+    }
+    CourseInterests {
+        int Id PK
+        int CourseId FK
+        string Name
+        string Status
+    }
+    Courses {
+        int Id PK
+        string DeliveryMode
+        string Nome
+        decimal Preco
+    }
+    RefreshTokens {
+        int Id PK
+        timestamp_tz ExpiresAt
+        timestamp_tz RevokedAt "opcional"
+        int UserId FK
+    }
+    Students {
+        int Id PK
+        string Name
+        string Status
+        int UserId FK "opcional"
+    }
+    Users {
+        int ID PK
+        string Email UK
+        string Nome
+        string Role
+    }
+    Users |o..o{ AuditLogs : "UserId"
+    Courses ||..o{ CourseInterests : "CourseId"
+    Users ||..o{ RefreshTokens : "UserId"
+    Users |o..o{ Students : "UserId"

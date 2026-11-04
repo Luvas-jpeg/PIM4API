@@ -32,7 +32,7 @@ public sealed class CourseRecommendationsController(AppDbContext db, CourseRecom
         {
             logger.LogWarning(error, "Unable to train course recommendation model for {Count} courses.", courses.Count);
             return Ok(new CourseRecommendationResult("model-unavailable", CourseRecommendationEngine.Algorithm,
-                null, null, courses.Count, 0, []));
+                null, null, courses.Count, 0, [], "model-unavailable"));
         }
     }
 }

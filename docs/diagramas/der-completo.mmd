@@ -1,0 +1,170 @@
+erDiagram
+    AuditLogs {
+        bigint Id PK
+        string Action
+        timestamp_tz CreatedAt
+        string EntityType
+        int UserId FK "opcional"
+    }
+    CourseAssessmentAnswers {
+        int Id PK
+        int AttemptId FK
+        boolean IsCorrect
+        int QuestionId FK
+        int SelectedOptionId FK
+    }
+    CourseAssessmentAttempts {
+        int Id PK
+        int AssessmentId FK
+        int CourseId FK
+        boolean Passed
+        int Score
+        int UserId FK
+    }
+    CourseAssessments {
+        int Id PK
+        int CourseId FK
+        int MinimumScore
+        string Title
+    }
+    CourseCertificates {
+        int Id PK
+        int CourseId FK
+        timestamp_tz IssuedAt
+        int UserId FK
+        string ValidationCode UK
+    }
+    CourseClasses {
+        int Id PK
+        int AvailableSeats
+        int Capacity
+        int CourseId FK
+        timestamp_tz DataRealizacao
+        string Status
+    }
+    CourseInterests {
+        int Id PK
+        int CourseId FK
+        string Name
+        string Status
+    }
+    CourseLessons {
+        int Id PK
+        int DurationMinutes
+        int ModuleId FK
+        string Title
+    }
+    CourseModules {
+        int Id PK
+        int CourseId FK
+        int SortOrder
+        string Title
+    }
+    CourseProgresses {
+        int Id PK
+        string CompletedLessons
+        float8 Percent
+        int UserId FK
+    }
+    CourseQuestionOptions {
+        int Id PK
+        boolean IsCorrect
+        int QuestionId FK
+        string Text
+    }
+    CourseQuestions {
+        int Id PK
+        int AssessmentId FK
+        string Statement
+    }
+    Courses {
+        int Id PK
+        string DeliveryMode
+        string Nome
+        decimal Preco
+    }
+    Enrollments {
+        int Id PK
+        int ClassId FK "opcional"
+        int CourseId FK "opcional"
+        timestamp_tz EnrolledAt
+        int OrderId FK
+        string Status
+        int StudentId FK
+    }
+    OrderItems {
+        int Id PK
+        int CourseId FK "opcional"
+        string NameSnapshot
+        int PedidoId FK
+        decimal PrecoUnitario
+        int Quantidade
+        int TurmaId FK "opcional"
+    }
+    Orders {
+        int Id PK
+        string PaymentStatus
+        int PromoCodeId FK "opcional"
+        string Status
+        decimal Total
+        int UsuarioId FK
+    }
+    PaymentWebhookEvents {
+        int Id PK
+        string EventId UK
+        int OrderId FK
+        string Status
+    }
+    PromoCodes {
+        int Id PK
+        string Code UK
+        decimal Discount
+        int UsageCount
+    }
+    RefreshTokens {
+        int Id PK
+        timestamp_tz ExpiresAt
+        timestamp_tz RevokedAt "opcional"
+        int UserId FK
+    }
+    Students {
+        int Id PK
+        string Name
+        string Status
+        int UserId FK "opcional"
+    }
+    Users {
+        int ID PK
+        string Email UK
+        string Nome
+        string Role
+    }
+    Users |o..o{ AuditLogs : "UserId"
+    CourseAssessmentAttempts ||..o{ CourseAssessmentAnswers : "AttemptId"
+    CourseQuestions ||..o{ CourseAssessmentAnswers : "QuestionId"
+    CourseQuestionOptions ||..o{ CourseAssessmentAnswers : "SelectedOptionId"
+    CourseAssessments ||..o{ CourseAssessmentAttempts : "AssessmentId"
+    Courses ||..o{ CourseAssessmentAttempts : "CourseId"
+    Users ||..o{ CourseAssessmentAttempts : "UserId"
+    Courses ||..o{ CourseAssessments : "CourseId"
+    Courses ||..o{ CourseCertificates : "CourseId"
+    Users ||..o{ CourseCertificates : "UserId"
+    Courses ||..o{ CourseClasses : "CourseId"
+    Courses ||..o{ CourseInterests : "CourseId"
+    CourseModules ||..o{ CourseLessons : "ModuleId"
+    Courses ||..o{ CourseModules : "CourseId"
+    Users ||..o{ CourseProgresses : "UserId"
+    CourseQuestions ||..o{ CourseQuestionOptions : "QuestionId"
+    CourseAssessments ||..o{ CourseQuestions : "AssessmentId"
+    CourseClasses |o..o{ Enrollments : "ClassId"
+    Courses |o..o{ Enrollments : "CourseId"
+    Orders ||..o{ Enrollments : "OrderId"
+    Students ||..o{ Enrollments : "StudentId"
+    Courses |o..o{ OrderItems : "CourseId"
+    Orders ||..o{ OrderItems : "PedidoId"
+    CourseClasses |o..o{ OrderItems : "TurmaId"
+    PromoCodes |o..o{ Orders : "PromoCodeId"
+    Users ||..o{ Orders : "UsuarioId"
+    Orders ||..o{ PaymentWebhookEvents : "OrderId"
+    Users ||..o{ RefreshTokens : "UserId"
+    Users |o..o{ Students : "UserId"
